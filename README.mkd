@@ -1,3 +1,10 @@
+This extension was forked by Business.com Media, Inc. [canni](from https://github.com/canni/YiiMongoDbSuite)
+so as to add various functionality that helps support our applications.
+
+The following was the README as provided by the forked project:
+
+---
+
 This extension is an almost complete, ActiveRecord like support for MongoDB in Yii
 It originally started as a fork of [MongoRecord](www.yiiframework.com/extension/mongorecord "MongoRecord")
 extension written by [tyohan](http://www.yiiframework.com/user/31/ "tyohan"),
@@ -156,7 +163,7 @@ Just define following model:
           array('name', 'length', 'max' => 255),
         );
       }
-      
+
       public function attributeLabels()
       {
         return array(
@@ -390,13 +397,13 @@ It's that easy. In place of the 'equals' key, you can use any of the following o
     - 'less'      | <
     - 'lessEq'    | <=
     - 'notEq'     | !=, <>
-    - 'in'        | 
-    - 'notIn'     | 
-    - 'all'       | 
-    - 'size'      | 
-    - 'exists'    | 
+    - 'in'        |
+    - 'notIn'     |
+    - 'all'       |
+    - 'size'      |
+    - 'exists'    |
     - 'type'      | // BSON type see mongodb docs for this
-    - 'notExists' | 
+    - 'notExists' |
     - 'mod'       | %
     - 'equals'    | ==
     - 'where'     | // JavaScript operator
@@ -421,7 +428,7 @@ Here are a few more examples for using criteria:
     // find the single user with the personal_number == 12345
     $criteria->personal_number('==', 12345);
     // OR like this:
-    $criteria->personal_number = 12345; 
+    $criteria->personal_number = 12345;
 
     $user = User::model->find($criteria);
 

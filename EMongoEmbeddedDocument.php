@@ -148,7 +148,7 @@ abstract class EMongoEmbeddedDocument extends CModel
 	 */
 	protected function afterEmbeddedDocsInit()
 	{
-		$this->onAfterEmbeddedDocsInit(new CModelEvent());
+		$this->onAfterEmbeddedDocsInit(new CModelEvent($this));
 	}
 
 	/**
