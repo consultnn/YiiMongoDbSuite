@@ -3,6 +3,7 @@
  * EMongoDocument.php
  *
  * PHP version 5.2+
+ * Mongo version 1.0.5+
  *
  * @author		Dariusz Górecki <darek.krk@gmail.com>
  * @author		Invenzzia Group, open-source division of CleverIT company http://www.invenzzia.org
@@ -570,164 +571,264 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 			return false;
 	}
 
-	/**
-	 * Inserts a row into the table based on this active record attributes.
-	 * If the table's primary key is auto-incremental and is null before insertion,
-	 * it will be populated with the actual value after insertion.
-	 * Note, validation is not performed in this method. You may call {@link validate} to perform the validation.
-	 * After the record is inserted to DB successfully, its {@link isNewRecord} property will be set false,
-	 * and its {@link scenario} property will be set to be 'update'.
-	 * @param array $attributes list of attributes that need to be saved. Defaults to null,
-	 * meaning all attributes that are loaded from DB will be saved.
-	 * @return boolean whether the attributes are valid and the record is inserted successfully.
-	 * @throws CException if the record is not new
-	 * @throws EMongoException on fail of insert or insert of empty document
-	 * @throws MongoCursorException on fail of insert, when safe flag is set to true
-	 * @throws MongoCursorTimeoutException on timeout of db operation , when safe flag is set to true
-	 * @since v1.0
-	 */
-	public function insert(array $attributes=null)
-	{
-		if(!$this->getIsNewRecord())
-			throw new CDbException(Yii::t('yii','The EMongoDocument cannot be inserted to database because it is not new.'));
-		if($this->beforeSave())
-		{
-			Yii::trace(get_class($this).'.insert()','ext.MongoDb.EMongoDocument');
-			$rawData = $this->toArray();
-			// free the '_id' container if empty, mongo will not populate it if exists
-			if(empty($rawData['_id']))
-				unset($rawData['_id']);
-			// filter attributes if set in param
-			if($attributes!==null)
-			{
-				foreach($rawData as $key=>$value)
-				{
-					if(!in_array($key, $attributes))
-						unset($rawData[$key]);
-				}
-			}
+    /**
+     * Inserts a row into the table based on this active record attributes.
+     * If the table's primary key is auto-incremental and is null before insertion,
+     * it will be populated with the actual value after insertion.
+     * Note, validation is not performed in this method. You may call
+     * {@link validate} to perform the validation.
+     * After the record is inserted to DB successfully, its {@link isNewRecord}
+     * property will be set false, and its {@link scenario} property will be set to
+     * be 'update'.
+     *
+     * @param array $attributes list of attributes that need to be saved. Defaults to
+     *                          null, meaning all attributes that are loaded from DB
+     *                          will be saved.
+     *
+     * @return boolean whether the attributes are valid and the record is inserted
+     *                 successfully.
+     *
+     * @throws CDbException                if the record is not new
+     * @throws EMongoException             on fail of insert or insert of empty
+     *                                     document
+     * @throws MongoCursorException        on fail of insert, when safe flag is set
+     *                                     to true
+     * @throws MongoCursorTimeoutException on timeout of db operation, when safe flag
+     *                                     is set to true
+     * @since v1.0
+     */
+    public function insert(array $attributes = null)
+    {
+        if (!$this->getIsNewRecord()) {
+            throw new CDbException(
+                Yii::t(
+                    'yii',
+                    'The EMongoDocument cannot be inserted to database because it '
+                    . 'is not new.'
+                )
+            );
+        }
+        if (! $this->beforeSave()) {
+            return false;
+        }
 
-			if(version_compare(Mongo::VERSION, '1.0.5','>=') === true)
-				$result = $this->getCollection()->insert($rawData, array(
-					'fsync'	=> $this->getFsyncFlag(),
-					'safe'	=> $this->getSafeFlag()
-				));
-			else
-				$result = $this->getCollection()->insert($rawData, CPropertyValue::ensureBoolean($this->getSafeFlag()));
+        Yii::trace(get_class($this) . '.insert()', 'ext.MongoDb.EMongoDocument');
+        $rawData = $this->toArray();
+        // free the '_id' container if empty, mongo will not populate it if exists
+        if (empty($rawData['_id'])) {
+            unset($rawData['_id']);
+        }
+        // filter attributes if set in param
+        if ($attributes !== null) {
+            foreach ($rawData as $key => $value) {
+                if (!in_array($key, $attributes)) {
+                    unset($rawData[$key]);
+                }
+            }
+        }
 
-			if($result !== false) // strict comparison needed
-			{
-				$this->_id = $rawData['_id'];
-				$this->afterSave();
-				$this->setIsNewRecord(false);
-				$this->setScenario('update');
+        try {
+            $result = $this->getCollection()->insert(
+                $rawData, array(
+                    'fsync' => $this->getFsyncFlag(),
+                    'safe'  => $this->getSafeFlag(),
+                )
+            );
+        } catch (MongoException $ex) {
+            Yii::log(
+                'Failed to submit insert(); retrying. ' . PHP_EOL
+                . 'Error: ' . $ex->getMessage(),
+                CLogger::LEVEL_WARNING
+            );
+            $result = $this->getCollection()->insert(
+                $rawData, array(
+                    'fsync' => $this->getFsyncFlag(),
+                    'safe'  => $this->getSafeFlag(),
+                )
+            );
+        }
 
-				return true;
-			}
+        if ($result !== false) { // strict comparison needed
+            $this->_id = $rawData['_id'];
+            $this->afterSave();
+            $this->setIsNewRecord(false);
+            $this->setScenario('update');
 
-			throw new EMongoException(Yii::t('yii', 'Can\t save document to disk, or try to save empty document!'));
-		}
-		return false;
-	}
+            return true;
+        }
 
-	/**
-	 * Updates the row represented by this active record.
-	 * All loaded attributes will be saved to the database.
-	 * Note, validation is not performed in this method. You may call {@link validate} to perform the validation.
-	 * @param array $attributes list of attributes that need to be saved. Defaults to null,
-	 * meaning all attributes that are loaded from DB will be saved.
-	 * @param boolean modify if set true only selected attributes will be replaced, and not
-	 * the whole document
-	 * @return boolean whether the update is successful
-	 * @throws CException if the record is new
-	 * @throws EMongoException on fail of update
-	 * @throws MongoCursorException on fail of update, when safe flag is set to true
-	 * @throws MongoCursorTimeoutException on timeout of db operation , when safe flag is set to true
-	 * @since v1.0
-	 */
-	public function update(array $attributes=null, $modify = false)
-	{
-		if($this->getIsNewRecord())
-			throw new CDbException(Yii::t('yii','The EMongoDocument cannot be updated because it is new.'));
-		if($this->beforeSave())
-		{
-			Yii::trace(get_class($this).'.update()','ext.MongoDb.EMongoDocument');
-			$rawData = $this->toArray();
-			// filter attributes if set in param
-			if($attributes!==null)
-			{
-				if (!in_array('_id', $attributes) && !$modify) $attributes[] = '_id'; // This is very easy to forget
+        throw new EMongoException(
+            Yii::t(
+                'yii', 'Can\t save document to disk, or try to save empty document!'
+            )
+        );
+    }
 
-				foreach($rawData as $key=>$value)
-				{
-					if(!in_array($key, $attributes))
-						unset($rawData[$key]);
-				}
-			}
+    /**
+     * Updates the row represented by this active record.
+     * All loaded attributes will be saved to the database.
+     * Note, validation is not performed in this method. You may call
+     * {@link validate} to perform the validation.
+     *
+     * @param array   $attributes list of attributes that need to be saved. Defaults
+     *                            to null, meaning all attributes that are loaded
+     *                            from DB will be saved.
+     * @param boolean $modify     if set true only selected attributes will be
+     *                            replaced, and not the whole document
+     *
+     * @return boolean whether the update is successful
+     *
+     * @throws CException                  if the record is new
+     * @throws EMongoException             on fail of update
+     * @throws MongoCursorException        on fail of update, when safe flag is set
+     *                                     to true
+     * @throws MongoCursorTimeoutException on timeout of db operation, when safe flag
+     *                                     is set to true
+     * @since v1.0
+     */
+    public function update(array $attributes = null, $modify = false)
+    {
+        if ($this->getIsNewRecord()) {
+            throw new CDbException(
+                Yii::t(
+                    'yii','The EMongoDocument cannot be updated because it is new.'
+                )
+            );
+        }
+        if (! $this->beforeSave()) {
+            return false;
+        }
+        Yii::trace(get_class($this).'.update()','ext.MongoDb.EMongoDocument');
+        $rawData = $this->toArray();
+        // filter attributes if set in param
+        if ($attributes !== null) {
+            if (!in_array('_id', $attributes) && !$modify) {
+                $attributes[] = '_id'; // This is very easy to forget
+            }
 
-			if($modify)
-			{
-				if(isset($rawData['_id']) === true)
-					unset($rawData['_id']);
-				$result = $this->getCollection()->update(
-					array('_id' => $this->_id),
-					array('$set' => $rawData),
-					array(
-						'fsync'=>$this->getFsyncFlag(),
-						'safe'=>$this->getSafeFlag(),
-						'multiple'=>false
-					)
-				);
-			} else {
-				if(version_compare(Mongo::VERSION, '1.0.5','>=') === true)
-					$result = $this->getCollection()->save($rawData, array(
-						'fsync'=>$this->getFsyncFlag(),
-						'safe'=>$this->getSafeFlag()
-					));
-				else
-					$result = $this->getCollection()->save($rawData);
-			}
+            foreach ($rawData as $key => $value) {
+                if (!in_array($key, $attributes)) {
+                    unset($rawData[$key]);
+                }
+            }
+        }
 
-			if($result !== false) // strict comparison needed
-			{
-				$this->afterSave();
+        if ($modify) {
+            if (isset($rawData['_id'])) {
+                unset($rawData['_id']);
+            }
+            try {
+                $result = $this->getCollection()->update(
+                    array('_id' => $this->_id),
+                    array('$set' => $rawData),
+                    array(
+                        'fsync'    => $this->getFsyncFlag(),
+                        'safe'     => $this->getSafeFlag(),
+                        'multiple' => false
+                    )
+                );
+            } catch (MongoException $ex) {
+                Yii::log(
+                    'Failed to submit update(); retrying. ' . PHP_EOL
+                    . 'Error: ' . $ex->getMessage(),
+                    CLogger::LEVEL_WARNING
+                );
+                $result = $this->getCollection()->update(
+                    array('_id' => $this->_id),
+                    array('$set' => $rawData),
+                    array(
+                        'fsync'    => $this->getFsyncFlag(),
+                        'safe'     => $this->getSafeFlag(),
+                        'multiple' => false
+                    )
+                );
+            }
+        } else {
+            try {
+                $result = $this->getCollection()->save(
+                    $rawData,
+                    array(
+                        'fsync' =>$this->getFsyncFlag(),
+                        'safe'  =>$this->getSafeFlag()
+                    )
+                );
+            } catch (MongoException $ex) {
+                Yii::log(
+                    'Failed to submit update(); retrying. ' . PHP_EOL
+                    . 'Error: ' . $ex->getMessage(),
+                    CLogger::LEVEL_WARNING
+                );
+                $result = $this->getCollection()->save(
+                    $rawData,
+                    array(
+                        'fsync' =>$this->getFsyncFlag(),
+                        'safe'  =>$this->getSafeFlag()
+                    )
+                );
+            }
+        }
 
-				return true;
-			}
+        if ($result !== false) { // strict comparison needed
+            $this->afterSave();
 
-			throw new CException(Yii::t('yii', 'Can\t save document to disk, or try to save empty document!'));
-		}
-	}
-	/**
-	 * Atomic, in-place update method.
-	 *
-	 * @since v1.3.6
-	 * @param EMongoModifier $modifier updating rules to apply
-	 * @param EMongoCriteria $criteria condition to limit updating rules
-	 * @return bool
-	 */
-	public function updateAll($modifier, $criteria=null) {
-		Yii::trace(get_class($this).'.updateAll()','ext.MongoDb.EMongoDocument');
-		if($modifier->canApply === true)
-		{
-			$this->applyScopes($criteria);
-			if(version_compare(Mongo::VERSION, '1.0.5','>=') === true)
-				$result = $this->getCollection()->update($criteria->getConditions(), $modifier->getModifiers(), array(
-					'fsync'=>$this->getFsyncFlag(),
-					'safe'=>$this->getSafeFlag(),
-					'upsert'=>false,
-					'multiple'=>true
-				));
-			else
-				$result = $this->getCollection()->update($criteria->getConditions(), $modifier->getModifiers(), array(
-					'upsert'=>false,
-					'multiple'=>true
-				));
-			return $result;
-		} else {
-			return false;
-		}
-	}
+            return true;
+        }
+
+        throw new CException(
+            Yii::t(
+                'yii', 'Can\t save document to disk, or try to save empty document!'
+            )
+        );
+    }
+
+    /**
+     * Atomic, in-place update method.
+     *
+     * @param EMongoModifier $modifier updating rules to apply
+     * @param EMongoCriteria $criteria condition to limit updating rules
+     *
+     * @since v1.3.6
+     * @return bool
+     */
+    public function updateAll($modifier, $criteria = null)
+    {
+        Yii::trace(get_class($this) . '.updateAll()', 'ext.MongoDb.EMongoDocument');
+        if ($modifier->canApply !== true) {
+            return false;
+        }
+
+        $this->applyScopes($criteria);
+        try {
+            $result = $this->getCollection()->update(
+                $criteria->getConditions(),
+                $modifier->getModifiers(),
+                array(
+                    'fsync'    => $this->getFsyncFlag(),
+                    'safe'     => $this->getSafeFlag(),
+                    'upsert'   => false,
+                    'multiple' => true
+                )
+            );
+        } catch (MongoException $ex) {
+            Yii::log(
+                'Failed to submit updateAll(); retrying. ' . PHP_EOL
+                . 'Error: ' . $ex->getMessage(),
+                CLogger::LEVEL_WARNING
+            );
+            $result = $this->getCollection()->update(
+                $criteria->getConditions(), $modifier->getModifiers(),
+                array(
+                    'fsync'    => $this->getFsyncFlag(),
+                    'safe'     => $this->getSafeFlag(),
+                    'upsert'   => false,
+                    'multiple' => true
+                )
+            );
+        }
+
+        return $result;
+    }
+
 	/**
 	 * Deletes the row corresponding to this EMongoDocument.
 	 * @return boolean whether the deletion is successful.
@@ -759,107 +860,205 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 			throw new CDbException(Yii::t('yii','The EMongoDocument cannot be deleted because it is new.'));
 	}
 
-	/**
-	 * Deletes document with the specified primary key.
-	 * See {@link find()} for detailed explanation about $condition and $params.
-	 * @param mixed $pk primary key value(s). Use array for multiple primary keys. For composite key, each key value must be an array (column name=>column value).
-	 * @param array|EMongoCriteria $condition query criteria.
-	 * @since v1.0
-	 */
-	public function deleteByPk($pk, $criteria=null)
-	{
-		Yii::trace(get_class($this).'.deleteByPk()','ext.MongoDb.EMongoDocument');
-		$this->applyScopes($criteria);
-		$criteria->mergeWith($this->createPkCriteria($pk));
+    /**
+     * Deletes document with the specified primary key.
+     * See {@link findByPk()} for detailed explanation about $pk and $criteria.
+     *
+     * @param mixed $pk primary key value(s). Use array for multiple primary keys.
+     *                  For composite key, each key value must be an array (column
+     *                  name=>column value).
+     * @param array|EMongoCriteria $condition query criteria.
+     *
+     * @since v1.0
+     */
+    public function deleteByPk($pk, $criteria = null)
+    {
+        Yii::trace(
+            get_class($this) . '.deleteByPk()', 'ext.MongoDb.EMongoDocument'
+        );
+        $this->applyScopes($criteria);
+        $criteria->mergeWith($this->createPkCriteria($pk));
 
-		if(version_compare(Mongo::VERSION, '1.0.5','>=') === true)
-			$result = $this->getCollection()->remove($criteria->getConditions(), array(
-				'justOne'=>true,
-				'fsync'=>$this->getFsyncFlag(),
-				'safe'=>$this->getSafeFlag()
-			));
-		else
-			$result = $this->getCollection()->remove($criteria->getConditions(), true);
+        try {
+            $result = $this->getCollection()->remove(
+                $criteria->getConditions(),
+                array(
+                    'justOne' => true,
+                    'fsync'   => $this->getFsyncFlag(),
+                    'safe'    => $this->getSafeFlag()
+                )
+            );
+        } catch (MongoException $ex) {
+            Yii::log(
+                'Failed to submit deleteByPk(); retrying. ' . PHP_EOL
+                . 'Error: ' . $ex->getMessage(),
+                CLogger::LEVEL_WARNING
+            );
+            $result = $this->getCollection()->remove(
+                $criteria->getConditions(),
+                array(
+                    'justOne' => true,
+                    'fsync'   => $this->getFsyncFlag(),
+                    'safe'    => $this->getSafeFlag()
+                )
+            );
+        }
 
-		return $result;
-	}
+        return $result;
+    }
 
 
-	/**
-	 * Repopulates this active record with the latest data.
-	 * @return boolean whether the row still exists in the database. If true, the latest data will be populated to this active record.
-	 * @since v1.0
-	 */
-	public function refresh()
-	{
-		Yii::trace(get_class($this).'.refresh()','ext.MongoDb.EMongoDocument');
-		if(!$this->getIsNewRecord() && $this->getCollection()->count(array('_id'=>$this->_id))==1)
-		{
-			$this->setAttributes($this->getCollection()->find(array('_id'=>$this->_id)), false);
-			return true;
-		}
-		else
-			return false;
-	}
+    /**
+     * Repopulates this active record with the latest data.
+     *
+     * @return boolean whether the row still exists in the database. If true, the
+     *                 latest data will be populated to this active record.
+     * @since v1.0
+     */
+    public function refresh()
+    {
+        Yii::trace(get_class($this) . '.refresh()', 'ext.MongoDb.EMongoDocument');
+        if (!$this->getIsNewRecord()
+            && 1 == $this->getCollection()->count(array('_id' => $this->_id))
+        ) {
+            try {
+                $this->setAttributes(
+                    $this->getCollection()->find(array('_id' => $this->_id)), false
+                );
+            } catch (MongoException $ex) {
+                Yii::log(
+                    'Failed to submit query for refresh(); retrying. ' . PHP_EOL
+                    . 'Error: ' . $ex->getMessage(),
+                    CLogger::LEVEL_WARNING
+                );
+                $this->setAttributes(
+                    $this->getCollection()->find(array('_id' => $this->_id)), false
+                );
+            }
 
-	/**
-	 * Finds a single EMongoDocument with the specified condition.
-	 * @param array|EMongoCriteria $condition query criteria.
-	 *
-	 * If an array, it is treated as the initial values for constructing a {@link EMongoCriteria} object;
-	 * Otherwise, it should be an instance of {@link EMongoCriteria}.
-	 *
-	 * @return EMongoDocument the record found. Null if no record is found.
-	 * @since v1.0
-	 */
-	public function find($criteria=null)
-	{
-		Yii::trace(get_class($this).'.find()','ext.MongoDb.EMongoDocument');
+            return true;
+        } else {
+            return false;
+        }
+    }
 
-		if($this->beforeFind())
-		{
-			$this->applyScopes($criteria);
+    /**
+     * Finds a single EMongoDocument with the specified condition.
+     *
+     * @param array|EMongoCriteria $criteria query criteria.
+     * If an array, it is treated as the initial values for constructing a
+     * {@link EMongoCriteria} object; Otherwise, it should be an instance of
+     * {@link EMongoCriteria}.
+     *
+     * @return EMongoDocument the record found. Null if no record is found.
+     * @since v1.0
+     */
+    public function find($criteria = null)
+    {
+        Yii::trace(get_class($this) . '.find()', 'ext.MongoDb.EMongoDocument');
 
-			$doc = $this->getCollection()->findOne($criteria->getConditions(), $criteria->getSelect());
+        if (! $this->beforeFind()) {
+            return null;
+        }
 
-			return $this->populateRecord($doc);
-		}
-		return null;
-	}
+        $this->applyScopes($criteria);
 
-	/**
-	 * Finds all documents satisfying the specified condition.
-	 * See {@link find()} for detailed explanation about $condition and $params.
-	 * @param array|EMongoCriteria $condition query criteria.
-	 * @return array list of documents satisfying the specified condition. An empty array is returned if none is found.
-	 * @since v1.0
-	 */
-	public function findAll($criteria=null)
-	{
-		Yii::trace(get_class($this).'.findAll()','ext.MongoDb.EMongoDocument');
+        try {
+            $doc = $this->getCollection()->findOne(
+                $criteria->getConditions(), $criteria->getSelect()
+            );
+        } catch (MongoException $ex) {
+            Yii::log(
+                'Failed to submit find(); retrying. ' . PHP_EOL
+                . 'Error: ' . $ex->getMessage(),
+                CLogger::LEVEL_WARNING
+            );
+            $doc = $this->getCollection()->findOne(
+                $criteria->getConditions(), $criteria->getSelect()
+            );
+        }
 
-		if($this->beforeFind())
-		{
-			$this->applyScopes($criteria);
+        return $this->populateRecord($doc);
+    }
 
-			$cursor = $this->getCollection()->find($criteria->getConditions());
+    /**
+     * Finds all documents satisfying the specified condition.
+     * See {@link find()} for detailed explanation about $condition and $params.
+     *
+     * @param array|EMongoCriteria $criteria query criteria.
+     *
+     * @return array list of documents satisfying the specified condition. An empty
+     *               array is returned if none is found.
+     * @since v1.0
+     */
+    public function findAll($criteria = null)
+    {
+        Yii::trace(get_class($this) . '.findAll()', 'ext.MongoDb.EMongoDocument');
 
-			if($criteria->getSort() !== null)
-				$cursor->sort($criteria->getSort());
-			if($criteria->getLimit() !== null)
-				$cursor->limit($criteria->getLimit());
-			if($criteria->getOffset() !== null)
-				$cursor->skip($criteria->getOffset());
-			if($criteria->getSelect())
-				$cursor->fields($criteria->getSelect());
+        if (! $this->beforeFind()) {
+            return array();
+        }
 
-			if($this->getUseCursor($criteria))
-				return new EMongoCursor($cursor, $this->model());
-			else
-				return $this->populateRecords($cursor);
-		}
-		return array();
-	}
+        $this->applyScopes($criteria);
+
+        $cursor = $this->getCursor($criteria);
+
+        if ($this->getUseCursor($criteria)) {
+            $return = new EMongoCursor($cursor, $this->model());
+        } else {
+            try {
+                $return = $this->populateRecords($cursor);
+            } catch (MongoException $ex) {
+                Yii::log(
+                    'Failed to submit populateRecords for findAll(); retrying. '
+                    . PHP_EOL . 'Error: ' . $ex->getMessage(),
+                    CLogger::LEVEL_WARNING
+                );
+                // The cursor may have died, submit query again to make sure all
+                // data is populated
+                $cursor = $this->getCursor($criteria);
+                $return = $this->populateRecords($cursor);
+            }
+        }
+
+        return $return;
+    }
+
+    /**
+     * Convert a criteria object into an actual MongoCursor object
+     *
+     * @param EMongoCriteria $criteria Criteria for query
+     *
+     * @return MongoCursor
+     */
+    protected function getCursor(EMongoCriteria $criteria)
+    {
+        try {
+            $cursor = $this->getCollection()->find($criteria->getConditions());
+        } catch (MongoException $ex) {
+            Yii::log(
+                'Failed to get Mongo cursor; retrying. ' . PHP_EOL
+                . 'Error: ' . $ex->getMessage(),
+                CLogger::LEVEL_WARNING
+            );
+            $cursor = $this->getCollection()->find($criteria->getConditions());
+        }
+
+        if (null !== $criteria->getSort()) {
+            $cursor->sort($criteria->getSort());
+        }
+        if (null !== $criteria->getLimit()) {
+            $cursor->limit($criteria->getLimit());
+        }
+        if (null !== $criteria->getOffset()) {
+            $cursor->skip($criteria->getOffset());
+        }
+        if ($criteria->getSelect()) {
+            $cursor->fields($criteria->getSelect());
+        }
+
+        return $cursor;
+    }
 
 	/**
 	 * Finds document with the specified primary key.
@@ -939,63 +1138,111 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 		return $this->findAll($criteria);
 	}
 
-	/**
-	 * Counts all documents satisfying the specified condition.
-	 * See {@link find()} for detailed explanation about $condition and $params.
-	 * @param array|EMongoCriteria $condition query criteria.
-	 * @return integer Count of all documents satisfying the specified condition.
-	 * @since v1.0
-	 */
-	public function count($criteria=null)
-	{
-		Yii::trace(get_class($this).'.count()','ext.MongoDb.EMongoDocument');
+    /**
+     * Counts all documents satisfying the specified condition.
+     * See {@link find()} for detailed explanation about $condition and $params.
+     *
+     * @param array|EMongoCriteria $criteria query criteria.
+     *
+     * @return integer Count of all documents satisfying the specified condition.
+     * @since v1.0
+     */
+    public function count($criteria = null)
+    {
+        Yii::trace(get_class($this) . '.count()', 'ext.MongoDb.EMongoDocument');
 
-		$this->applyScopes($criteria);
+        $this->applyScopes($criteria);
 
-		return $this->getCollection()->count($criteria->getConditions());
-	}
+        try {
+            $result = $this->getCollection()->count($criteria->getConditions());
+        } catch (MongoException $ex) {
+            Yii::log(
+                'Failed to submit count(); retrying. ' . PHP_EOL
+                . 'Error: ' . $ex->getMessage(),
+                CLogger::LEVEL_WARNING
+            );
+            $result = $this->getCollection()->count($criteria->getConditions());
+        }
 
-	/**
-	 * Counts all documents satisfying the specified condition.
-	 * See {@link find()} for detailed explanation about $condition and $params.
-	 * @param array|EMongoCriteria $condition query criteria.
-	 * @return integer Count of all documents satisfying the specified condition.
-	 * @since v1.2.2
-	 */
-	public function countByAttributes(array $attributes)
-	{
-		Yii::trace(get_class($this).'.countByAttributes()','ext.MongoDb.EMongoDocument');
+        return $result;
+    }
 
-		$criteria = new EMongoCriteria;
-		foreach($attributes as $name=>$value)
-			$criteria->$name = $value;
+    /**
+     * Counts all documents satisfying the specified condition.
+     * See {@link findByAttributes()} for detailed explanation about $attributes.
+     *
+     * @param array $attributes query criteria.
+     *
+     * @return integer Count of all documents satisfying the specified condition.
+     * @since v1.2.2
+     */
+    public function countByAttributes(array $attributes)
+    {
+        Yii::trace(
+            get_class($this).'.countByAttributes()','ext.MongoDb.EMongoDocument'
+        );
 
-		$this->applyScopes($criteria);
+        $criteria = new EMongoCriteria;
+        foreach ($attributes as $name => $value) {
+            $criteria->$name = $value;
+        }
 
-		return $this->getCollection()->count($criteria->getConditions());
-	}
+        $this->applyScopes($criteria);
 
-	/**
-	 * Deletes documents with the specified primary keys.
-	 * See {@link find()} for detailed explanation about $condition and $params.
-	 * @param mixed $pk primary key value(s). Use array for multiple primary keys. For composite key, each key value must be an array (column name=>column value).
-	 * @param array|EMongoCriteria $condition query criteria.
-	 * @since v1.0
-	 */
-	public function deleteAll($criteria=null)
-	{
-		Yii::trace(get_class($this).'.deleteByPk()','ext.MongoDb.EMongoDocument');
-		$this->applyScopes($criteria);
+        try {
+            $result = $this->getCollection()->count($criteria->getConditions());
+        } catch (MongoException $ex) {
+            Yii::log(
+                'Failed to submit countByAttributes(); retrying. ' . PHP_EOL
+                . 'Error: ' . $ex->getMessage(),
+                CLogger::LEVEL_WARNING
+            );
+            $result = $this->getCollection()->count($criteria->getConditions());
+        }
 
-		if(version_compare(Mongo::VERSION, '1.0.5','>=') === true)
-			return $this->getCollection()->remove($criteria->getConditions(), array(
-				'justOne'=>false,
-				'fsync'=>$this->getFsyncFlag(),
-				'safe'=>$this->getSafeFlag()
-			));
-		else
-			return $this->getCollection()->remove($criteria->getConditions(), false);
-	}
+        return $result;
+    }
+
+    /**
+     * Deletes documents with the specified critieria.
+     * See {@link find()} for detailed explanation about $criteria.
+     *
+     * @param array|EMongoCriteria $condition query criteria.
+     *
+     * @see MongoCollection::remove()
+     * @return true|array The result of MongoCollection::remove()
+     * @since v1.0
+     */
+    public function deleteAll($criteria = null)
+    {
+        Yii::trace(get_class($this).'.deleteAll()', 'ext.MongoDb.EMongoDocument');
+        $this->applyScopes($criteria);
+
+        try {
+            $result = $this->getCollection()->remove(
+                $criteria->getConditions(), array(
+                    'justOne' => false,
+                    'fsync'   => $this->getFsyncFlag(),
+                    'safe'    => $this->getSafeFlag(),
+                )
+            );
+        } catch (MongoException $ex) {
+            Yii::log(
+                'Failed to submit deleteAll(); retrying. ' . PHP_EOL
+                . 'Error: ' . $ex->getMessage(),
+                CLogger::LEVEL_WARNING
+            );
+            $result = $this->getCollection()->remove(
+                $criteria->getConditions(), array(
+                    'justOne' => false,
+                    'fsync'   => $this->getFsyncFlag(),
+                    'safe'    => $this->getSafeFlag(),
+                )
+            );
+        }
+
+        return $result;
+    }
 
 	/**
 	 * This event is raised before the record is saved.
