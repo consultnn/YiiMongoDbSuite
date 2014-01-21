@@ -349,11 +349,8 @@ class EMongoCriteria extends CComponent
 	/**
 	 * Return selected fields
 	 *
-	 * @param boolean $forCursor MongoCursor::fields() method requires
-	 *                the fields to be specified as a hashmap. When this
-	 *                parameter is set to true, then we'll return
-	 *                the fields in this format
 	 * @since v1.3.1
+	 * @return array|null Field names to be selected (field => boolean)
 	 */
 	public function getSelect()
 	{
@@ -488,4 +485,99 @@ class EMongoCriteria extends CComponent
 		}
 		return $this;
 	}
+
+    /**
+     * Generate a MongoDB query string based on the given criteria.
+     *
+     * @param EMongoCriteria $criteria   Criteria for operation
+     * @param string         $operator   Operation that is being performed
+     * @param string         $collection Collection operation is performed on
+     *
+     * @return string The generated MongoDb query string
+     */
+    public static function toString(EMongoCriteria $criteria, $operator = 'find',
+        $collection = null
+    ) {
+        if ($collection) {
+            $query = 'db.' . $collection . '.';
+        } else {
+            $query = '';
+        }
+        $query .= $operator . '(';
+        $query .= self::queryValueToString($criteria->getConditions());
+        $fields = $criteria->getSelect();
+        if (! empty($fields)) {
+            $query .= ', ' . self::queryValueToString($fields);
+        }
+        $query .= ')';
+        // Add fields valid only for cursors
+        if ('find' === $operator) {
+            if (array() !== $criteria->getSort()) {
+                $query .= '.sort(' . self::queryValueToString($criteria->getSort())
+                . ')';
+            }
+            if (null !== $criteria->getLimit()) {
+                $query .= '.limit(' . $criteria->getLimit() . ')';
+            }
+            if (null !== $criteria->getOffset()) {
+                $query .= '.skip(' . $criteria->getOffset() . ')';
+            }
+        }
+
+        return $query;
+    }
+
+    /**
+     * Convert a condition value to a string
+     *
+     * @param mixed $value Value to be converted to a string
+     *
+     * @return string Query portion as a string
+     */
+    public static function queryValueToString($value)
+    {
+        if (! is_array($value)) {
+            // Force objects to be explicitly cast as a string (e.g. MongoId)
+            if ($value instanceof MongoId) {
+                $string = 'ObjectId("' . (string) $value . '")';
+            } elseif ($value instanceof MongoRegex) {
+                $string = (string) $value;
+            } else {
+                $string = CJSON::encode($value);
+            }
+        } else {
+            $string = '';
+            $isArray = isset($value[0]);
+            if ($isArray) {
+                $string .= '[';
+            } else {
+                $string .= '{';
+            }
+            // Ensure inner values are serialized
+            foreach ($value as $key => $innerValue) {
+                // Check if an associative array or not
+                if (!is_int($key)) {
+                    $string .= CJSON::encode($key) . ' : ';
+                }
+                $string .= self::queryValueToString($innerValue) . ', ';
+            }
+            $string = rtrim($string, ', ');
+            if ($isArray) {
+                $string .= ']';
+            } else {
+                $string .= '}';
+            }
+        }
+
+        return $string;
+    }
+
+    /**
+     * @return string Query as a string
+     */
+    public function __toString()
+    {
+        // Default to a find operation
+        return self::toString($this, 'find');
+    }
 }
