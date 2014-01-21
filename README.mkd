@@ -1,6 +1,8 @@
 This extension was forked by Business.com Media, Inc. [canni](from https://github.com/canni/YiiMongoDbSuite)
 so as to add various functionality that helps support our applications.
 
+Requires 1.3.0+ version of the PHP Mongo driver
+
 The following was the README as provided by the forked project:
 
 ---

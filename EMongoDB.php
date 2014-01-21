@@ -3,6 +3,7 @@
  * EMongoDB.php
  *
  * PHP version 5.2+
+ * Mongo version 1.3+
  *
  * @author		Dariusz Górecki <darek.krk@gmail.com>
  * @author		Invenzzia Group, open-source division of CleverIT company http://www.invenzzia.org
@@ -22,7 +23,7 @@
  */
 class EMongoDB extends CApplicationComponent
 {
-	/**
+    /**
      * @var string host:port
      *
      * Correct syntax is:
@@ -41,11 +42,21 @@ class EMongoDB extends CApplicationComponent
 	 */
 	public $autoConnect = true;
 
-	/**
-     * @var false|string $persistentConnection false for non-persistent connection, string for persistent connection id to use
-     * @since v1.0
+    /**
+     * Name of the replica set (if any)
+     * @see http://php.net/manual/en/mongo.connecting.rs.php
+     * @var string|null
      */
-    public $persistentConnection = false;
+    public $replicaSet;
+
+    /**
+     * Read preference used when reading from a replica set. Defaults to the closest
+     * server.
+     * @see http://php.net/manual/en/mongo.readpreferences.php
+     * @var string
+     * @example MongoClient::RP_PRIMARY
+     */
+    public $readPreference = MongoClient::RP_NEAREST;
 
     /**
      * @var string $dbName name of the Mongo database to use
@@ -59,9 +70,9 @@ class EMongoDB extends CApplicationComponent
     private $_mongoDb;
 
     /**
-     * @var Mongo $_mongoConnection instance of MongoDB driver
+     * @var MongoClient $_mongoConnection instance of MongoDB driver
      */
-	private $_mongoConnection;
+    private $_mongoConnection;
 
 	/**
 	 * If set to TRUE all internal DB operations will use FSYNC flag with data modification requests,
@@ -118,55 +129,57 @@ class EMongoDB extends CApplicationComponent
 			return $this->getConnection()->connect();
 	}
 
-	/**
-	 * Returns Mongo connection instance if not exists will create new
-	 *
-	 * @return Mongo
-	 * @throws EMongoException
-	 * @since v1.0
-	 */
-	public function getConnection()
-	{
-		if($this->_mongoConnection === null)
-		{
-			try
-			{
-				Yii::trace('Opening MongoDB connection', 'ext.MongoDb.EMongoDB');
-				if(empty($this->connectionString))
-					throw new EMongoException(Yii::t('yii', 'EMongoDB.connectionString cannot be empty.'));
+    /**
+     * Returns Mongo connection instance if not exists will create new
+     *
+     * @return MongoClient
+     * @throws EMongoException
+     * @since v1.0
+     */
+    public function getConnection()
+    {
+        if (null === $this->_mongoConnection) {
+            try {
+                Yii::trace('Opening MongoDB connection', 'ext.MongoDb.EMongoDB');
+                if (empty($this->connectionString)) {
+                    throw new EMongoException(
+                        Yii::t('yii', 'EMongoDB.connectionString cannot be empty.')
+                    );
+                }
 
-				if($this->persistentConnection !== false)
-					$this->_mongoConnection = new Mongo($this->connectionString, array(
-						'connect'=>$this->autoConnect,
-						'persist'=>$this->persistentConnection
-					));
-				else
-					$this->_mongoConnection = new Mongo($this->connectionString, array(
-						'connect'=>$this->autoConnect,
-					));
+                $params = array('connect' => $this->autoConnect);
 
-				return $this->_mongoConnection;
-			}
-			catch(MongoConnectionException $e)
-			{
-				throw new EMongoException(Yii::t(
-					'yii',
-					'EMongoDB failed to open connection: {error}',
-					array('{error}'=>$e->getMessage())
-				), $e->getCode());
-			}
-		}
-		else
-			return $this->_mongoConnection;
-	}
+                if (!empty($this->replicaSet)) {
+                    $params['replicaSet']     = $this->replicaSet;
+                    $params['readPreference'] = $this->readPreference;
+                }
+
+                $this->_mongoConnection = new MongoClient(
+                    $this->connectionString, $params
+                );
+
+            } catch (MongoConnectionException $e) {
+                throw new EMongoException(
+                    Yii::t(
+                        'yii',
+                        'EMongoDB failed to open connection: {error}',
+                        array('{error}'=>$e->getMessage())
+                    ),
+                    $e->getCode()
+                );
+            }
+        }
+
+        return $this->_mongoConnection;
+    }
 
 	/**
 	 * Set the connection
 	 *
-	 * @param Mongo $connection
+	 * @param MongoClient $connection
 	 * @since v1.0
 	 */
-	public function setConnection(Mongo $connection)
+	public function setConnection(MongoClient $connection)
 	{
 		$this->_mongoConnection = $connection;
 	}
@@ -183,46 +196,41 @@ class EMongoDB extends CApplicationComponent
 			return $this->_mongoDb;
 	}
 
-	/**
-	 * Set MongoDB instance
-	 * Enter description here ...
-	 * @param string $name
-	 * @since v1.0
-	 */
-	public function setDbInstance($name)
-	{
-		$this->_mongoDb = $this->getConnection()->selectDb($name);
-	}
+    /**
+     * Set MongoDB instance
+     *
+     * @param string $name Name of Mongo database
+     *
+     * @since v1.0
+     */
+    public function setDbInstance($name)
+    {
+        $this->_mongoDb = $this->getConnection()->selectDb($name);
+    }
 
-	/**
-	 * Closes the currently active Mongo connection.
-	 * It does nothing if the connection is already closed.
-	 * @since v1.0
-	 */
-	protected function close(){
-        if($this->_mongoConnection!==null){
+    /**
+     * Closes the currently active Mongo connection.
+     * It does nothing if the connection is already closed.
+     * @since v1.0
+     */
+    protected function close()
+    {
+        if (null !== $this->_mongoConnection) {
             $this->_mongoConnection->close();
-            $this->_mongoConnection=null;
+            $this->_mongoConnection = null;
             Yii::trace('Closing MongoDB connection', 'ext.MongoDb.EMongoDB');
-        }
-	}
-
-	/**
-	 * If we have don't use presist connection, close it
-	 * @since v1.0
-	 */
-	public function __destruct(){
-        if(!$this->persistentConnection){
-            $this->close();
         }
     }
 
     /**
      * Drop the current DB
+     *
      * @since v1.0
+     * @return boolean Whether the drop was successful
      */
     public function dropDb()
     {
-		$this->_mongoDb->drop();
+        $result = $this->getDbInstance()->drop();
+        return isset($result) && 1 == $result['ok'];
     }
 }
