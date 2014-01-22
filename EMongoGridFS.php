@@ -91,7 +91,7 @@ abstract class EMongoGridFS extends EMongoDocument
         if (! $this->beforeSave()) {
             return false;
         }
-        Yii::trace(get_class($this) . '.insert()', 'ext.MongoDb.EMongoGridFS');
+        Yii::trace(get_class($this) . '.insert()', 'MongoDb.EMongoGridFS');
         $rawData = $this->toArray();
         // free the '_id' container if empty, mongo will not populate it if exists
         if (empty($rawData['_id'])) {
@@ -125,7 +125,7 @@ abstract class EMongoGridFS extends EMongoDocument
         if (!$this->beforeSave()) {
             return false;
         }
-        Yii::trace(get_class($this) . '.insertWithPk()', 'ext.MongoDb.EMongoGridFS');
+        Yii::trace(get_class($this) . '.insertWithPk()', 'MongoDb.EMongoGridFS');
         $rawData = $this->toArray();
         $rawData['_id'] = $pk;
 
@@ -244,7 +244,7 @@ abstract class EMongoGridFS extends EMongoDocument
      */
     public function update(array $attributes = null, $modify = true)
     {
-        Yii::trace(get_class($this) . '.update()', 'ext.MongoDb.EMongoGridFS');
+        Yii::trace(get_class($this) . '.update()', 'MongoDb.EMongoGridFS');
         if ($this->getIsNewRecord()) {
             throw new CDbException(
                 Yii::t(
@@ -278,9 +278,7 @@ abstract class EMongoGridFS extends EMongoDocument
      */
     public function populateRecord($document, $callAfterFind = true)
     {
-        Yii::trace(
-            get_class($this) . '.populateRecord()', 'ext.MongoDb.EMongoGridFS'
-        );
+        Yii::trace(get_class($this) . '.populateRecord()', 'MongoDb.EMongoGridFS');
         if ($document instanceof MongoGridFSFile) {
             $model = parent::populateRecord($document->file, $callAfterFind);
             $model->_gridFSFile = $document;
@@ -299,7 +297,7 @@ abstract class EMongoGridFS extends EMongoDocument
      */
     public function getSize()
     {
-        Yii::trace(get_class($this) . '.getSize()', 'ext.MongoDb.EMongoGridFS');
+        Yii::trace(get_class($this) . '.getSize()', 'MongoDb.EMongoGridFS');
         if (method_exists($this->_gridFSFile, 'getSize')) {
             return $this->_gridFSFile->getSize();
         } else {
@@ -316,7 +314,7 @@ abstract class EMongoGridFS extends EMongoDocument
      */
     public function getFilename()
     {
-        Yii::trace(get_class($this) . '.getFilename()', 'ext.MongoDb.EMongoGridFS');
+        Yii::trace(get_class($this) . '.getFilename()', 'MongoDb.EMongoGridFS');
         if (method_exists($this->_gridFSFile, 'getFilename')) {
             return $this->_gridFSFile->getFilename();
         } else {
@@ -333,7 +331,7 @@ abstract class EMongoGridFS extends EMongoDocument
      */
     public function getBytes()
     {
-        Yii::trace(get_class($this) . '.getBytes()', 'ext.MongoDb.EMongoGridFS');
+        Yii::trace(get_class($this) . '.getBytes()', 'MongoDb.EMongoGridFS');
         if (method_exists($this->_gridFSFile, 'getBytes')) {
             return $this->_gridFSFile->getBytes();
         } else {
@@ -352,7 +350,7 @@ abstract class EMongoGridFS extends EMongoDocument
      */
     public function write($filename = null)
     {
-        Yii::trace(get_class($this) . '.write()', 'ext.MongoDb.EMongoGridFS');
+        Yii::trace(get_class($this) . '.write()', 'MongoDb.EMongoGridFS');
         if (method_exists($this->_gridFSFile, 'write') === true) {
             return $this->_gridFSFile->write($filename);
         } else {

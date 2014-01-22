@@ -2,7 +2,7 @@
 /**
  * EMongoDB.php
  *
- * PHP version 5.2+
+ * PHP version 5.3+
  * Mongo version 1.3+
  *
  * @author		Dariusz Górecki <darek.krk@gmail.com>
@@ -14,6 +14,11 @@
  * @package		ext.YiiMongoDbSuite
  * @since v1.0
  */
+
+/**
+ * Set alias for intra-package references
+ */
+Yii::setPathOfAlias('MongoDb', __DIR__);
 
 /**
  * EMongoDB
@@ -140,7 +145,7 @@ class EMongoDB extends CApplicationComponent
     {
         if (null === $this->_mongoConnection) {
             try {
-                Yii::trace('Opening MongoDB connection', 'ext.MongoDb.EMongoDB');
+                Yii::trace('Opening MongoDB connection', 'MongoDb.EMongoDB');
                 if (empty($this->connectionString)) {
                     throw new EMongoException(
                         Yii::t('yii', 'EMongoDB.connectionString cannot be empty.')
@@ -222,7 +227,7 @@ class EMongoDB extends CApplicationComponent
         if (null !== $this->_mongoConnection) {
             $this->_mongoConnection->close();
             $this->_mongoConnection = null;
-            Yii::trace('Closing MongoDB connection', 'ext.MongoDb.EMongoDB');
+            Yii::trace('Closing MongoDB connection', 'MongoDb.EMongoDB');
         }
     }
 

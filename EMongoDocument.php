@@ -692,7 +692,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             return false;
         }
 
-        Yii::trace(get_class($this) . '.insert()', 'ext.MongoDb.EMongoDocument');
+        Yii::trace(get_class($this) . '.insert()', 'MongoDb.EMongoDocument');
         $rawData = $this->toArray();
         // free the '_id' container if empty, mongo will not populate it if exists
         if (empty($rawData['_id'])) {
@@ -790,7 +790,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         if (! $this->beforeSave()) {
             return false;
         }
-        Yii::trace(get_class($this).'.update()','ext.MongoDb.EMongoDocument');
+        Yii::trace(get_class($this).'.update()', 'MongoDb.EMongoDocument');
         $rawData = $this->toArray();
         // filter attributes if set in param
         if ($attributes !== null) {
@@ -903,7 +903,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      */
     public function updateAll($modifier, $criteria = null)
     {
-        Yii::trace(get_class($this) . '.updateAll()', 'ext.MongoDb.EMongoDocument');
+        Yii::trace(get_class($this) . '.updateAll()', 'MongoDb.EMongoDocument');
         if ($modifier->canApply !== true) {
             return false;
         }
@@ -965,7 +965,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 )
             );
         }
-        Yii::trace(get_class($this) . '.delete()', 'ext.MongoDb.EMongoDocument');
+        Yii::trace(get_class($this) . '.delete()', 'MongoDb.EMongoDocument');
         if ($this->beforeDelete()) {
             $result = $this->deleteByPk($this->getPrimaryKey());
 
@@ -995,9 +995,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      */
     public function deleteByPk($pk, $criteria = null)
     {
-        Yii::trace(
-            get_class($this) . '.deleteByPk()', 'ext.MongoDb.EMongoDocument'
-        );
+        Yii::trace(get_class($this) . '.deleteByPk()', 'MongoDb.EMongoDocument');
         $this->applyScopes($criteria);
         $criteria->mergeWith($this->createPkCriteria($pk));
 
@@ -1051,7 +1049,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      */
     public function refresh()
     {
-        Yii::trace(get_class($this) . '.refresh()', 'ext.MongoDb.EMongoDocument');
+        Yii::trace(get_class($this) . '.refresh()', 'MongoDb.EMongoDocument');
         if ($this->getIsNewRecord()) {
             return false;
         }
@@ -1120,7 +1118,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      */
     public function find($criteria = null)
     {
-        Yii::trace(get_class($this) . '.find()', 'ext.MongoDb.EMongoDocument');
+        Yii::trace(get_class($this) . '.find()', 'MongoDb.EMongoDocument');
 
         if (! $this->beforeFind()) {
             return null;
@@ -1169,7 +1167,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      */
     public function findAll($criteria = null)
     {
-        Yii::trace(get_class($this) . '.findAll()', 'ext.MongoDb.EMongoDocument');
+        Yii::trace(get_class($this) . '.findAll()', 'MongoDb.EMongoDocument');
 
         if (! $this->beforeFind()) {
             return array();
@@ -1264,7 +1262,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      */
     public function findByPk($pk, $criteria = null)
     {
-        Yii::trace(get_class($this) . '.findByPk()', 'ext.MongoDb.EMongoDocument');
+        Yii::trace(get_class($this) . '.findByPk()', 'MongoDb.EMongoDocument');
         $criteria = new EMongoCriteria($criteria);
         $criteria->mergeWith($this->createPkCriteria($pk));
 
@@ -1289,7 +1287,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      */
     public function findAllByPk($pk, $criteria = null)
     {
-        Yii::trace(get_class($this) . '.findAllByPk()', 'ext.MongoDb.EMongoDocument');
+        Yii::trace(get_class($this) . '.findAllByPk()', 'MongoDb.EMongoDocument');
         $criteria = new EMongoCriteria($criteria);
         $criteria->mergeWith($this->createPkCriteria($pk, true));
 
@@ -1347,7 +1345,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      */
     public function count($criteria = null)
     {
-        Yii::trace(get_class($this) . '.count()', 'ext.MongoDb.EMongoDocument');
+        Yii::trace(get_class($this) . '.count()', 'MongoDb.EMongoDocument');
 
         $this->applyScopes($criteria);
 
@@ -1388,7 +1386,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
     public function countByAttributes(array $attributes)
     {
         Yii::trace(
-            get_class($this) . '.countByAttributes()', 'ext.MongoDb.EMongoDocument'
+            get_class($this) . '.countByAttributes()', 'MongoDb.EMongoDocument'
         );
 
         $criteria = new EMongoCriteria;
@@ -1436,7 +1434,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      */
     public function deleteAll($criteria = null)
     {
-        Yii::trace(get_class($this).'.deleteAll()', 'ext.MongoDb.EMongoDocument');
+        Yii::trace(get_class($this).'.deleteAll()', 'MongoDb.EMongoDocument');
         $this->applyScopes($criteria);
 
         $profile = $this->getEnableProfiler();
@@ -1864,5 +1862,24 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         }
 
         return $arr;
+    }
+
+    /**
+     * Custom rule to ensure an attribute is unique. Overrides CActiveRecord-based
+     * {@link CUniqueValidator} by being an inline validator and proxies validation
+     * to EMongoUniqueValidator.
+     *
+     * @param string $attribute Attribute to be validated
+     * @param array  $params    Parameters passed to EMongoUniqueValidator
+     *
+     * @see EMongoUniqueValidator
+     */
+    public function uniqueValidator($attribute, $params)
+    {
+        // Proxy to EMongoUniqueValidator
+        $validator = CValidator::createValidator(
+            'MongoDB.extra.MongoUniqueValidator', $this, $attribute, $params
+        );
+        $validator->validate($this, array($attribute));
     }
 }
