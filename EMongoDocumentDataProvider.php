@@ -156,15 +156,22 @@ class EMongoDocumentDataProvider extends CDataProvider
 		return $keys;
 	}
 
-	/**
-	 * Calculates the total number of data items.
-	 * @return integer the total number of data items.
-	 * @since v1.0
-	 */
-	public function calculateTotalItemCount()
-	{
-		return $this->model->count($this->_criteria);
-	}
+    /**
+     * Calculates the total number of data items.
+     * @return integer the total number of data items.
+     * @since v1.0
+     */
+    public function calculateTotalItemCount()
+    {
+        // Calling count() causes the scope to be reset so we need to get the
+        // count here, reset the scope to what it was originally then return the
+        // count
+        $criteria = clone $this->getCriteria();
+        $count = $this->model->count($this->_criteria);
+        $this->_criteria = $criteria;
+
+        return $count;
+    }
 
 	/**
 	 * Converts the "ORDER BY" clause into an array representing the sorting directions.
