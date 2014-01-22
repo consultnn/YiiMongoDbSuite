@@ -90,56 +90,64 @@ class EMongoDocumentDataProvider extends CDataProvider
 			$this->keyField='_id';
 	}
 
-	/**
-	 * Returns the criteria.
-	 * @return array the query criteria
-	 * @since v1.0
-	 */
-	public function getCriteria()
-	{
-		return $this->_criteria;
-	}
+    /**
+     * Returns the criteria.
+     *
+     * @return EMongoCriteria|null the query criteria
+     * @since v1.0
+     */
+    public function getCriteria()
+    {
+        return $this->_criteria;
+    }
 
-	/**
-	 * Sets the query criteria.
-	 * @param array $value the query criteria. Array representing the MongoDB query criteria.
-	 * @since v1.0
-	 */
-	public function setCriteria($criteria)
-	{
-		if(is_array($criteria))
-			$this->_criteria = new EMongoCriteria($criteria);
-		else if($criteria instanceof EMongoCriteria)
-			$this->_criteria = $criteria;
-	}
+    /**
+     * Sets the query criteria.
+     *
+     * @param array|EMongoCriteria $criteria The query criteria. If an array, it will
+     *                                       be passed to the constructor of
+     *                                       EMongoCriteria
+     *
+     * @see EMongoCriteria::__construct()
+     * @since v1.0
+     */
+    public function setCriteria($criteria)
+    {
+        if (is_array($criteria)) {
+            $this->_criteria = new EMongoCriteria($criteria);
+        } elseif ($criteria instanceof EMongoCriteria) {
+            $this->_criteria = $criteria;
+        }
+    }
 
-	/**
-	 * Fetches the data from the persistent data storage.
-	 * @return array list of data items
-	 * @since v1.0
-	 */
-	protected function fetchData()
-	{
-		if(($pagination=$this->getPagination())!==false)
-		{
-			$pagination->setItemCount($this->getTotalItemCount());
+    /**
+     * Fetches the data from the persistent data storage.
+     *
+     * @return EMongoDocument[]|EMongoCursor list of data items
+     * @since v1.0
+     */
+    protected function fetchData()
+    {
+        $pagination = $this->getPagination();
+        if (false !== $pagination) {
+            $pagination->setItemCount($this->getTotalItemCount());
 
-			$this->_criteria->setLimit($pagination->getLimit());
-			$this->_criteria->setOffset($pagination->getOffset());
-		}
+            $this->_criteria->setLimit($pagination->getLimit());
+            $this->_criteria->setOffset($pagination->getOffset());
+        }
 
-		if(($sort=$this->getSort())!==false && ($order=$sort->getOrderBy())!='')
-		{
-			$sort=array();
-			foreach($this->getSortDirections($order) as $name=>$descending)
-			{
-				$sort[$name]=$descending ? EMongoCriteria::SORT_DESC : EMongoCriteria::SORT_ASC;
-			}
-			$this->_criteria->setSort($sort);
-		}
+        $sort = $this->getSort();
+        if (false !== $sort && '' != ($order = $sort->getOrderBy())) {
+            $sort = array();
+            foreach ($this->getSortDirections($order) as $name => $descending) {
+                $sort[$name] = $descending
+                    ? EMongoCriteria::SORT_DESC : EMongoCriteria::SORT_ASC;
+            }
+            $this->_criteria->setSort($sort);
+        }
 
-		return $this->model->findAll($this->_criteria);
-	}
+        return $this->model->findAll($this->_criteria);
+    }
 
 	/**
 	 * Fetches the data item keys from the persistent data storage.

@@ -173,28 +173,32 @@ class EMongoDB extends CApplicationComponent
         return $this->_mongoConnection;
     }
 
-	/**
-	 * Set the connection
-	 *
-	 * @param MongoClient $connection
-	 * @since v1.0
-	 */
-	public function setConnection(MongoClient $connection)
-	{
-		$this->_mongoConnection = $connection;
-	}
+    /**
+     * Set the connection
+     *
+     * @param MongoClient $connection
+     *
+     * @since v1.0
+     */
+    public function setConnection(MongoClient $connection)
+    {
+        $this->_mongoConnection = $connection;
+    }
 
-	/**
-	 * Get MongoDB instance
-	 * @since v1.0
-	 */
-	public function getDbInstance()
-	{
-		if($this->_mongoDb === null)
-			return $this->_mongoDb = $this->getConnection()->selectDB($this->dbName);
-		else
-			return $this->_mongoDb;
-	}
+    /**
+     * Get MongoDB instance
+     *
+     * @return MongoDB Mongo object with configured dbName
+     * @since v1.0
+     */
+    public function getDbInstance()
+    {
+        if (null === $this->_mongoDb) {
+            $this->setDbInstance($this->dbName);
+        }
+
+        return $this->_mongoDb;
+    }
 
     /**
      * Set MongoDB instance
@@ -205,7 +209,7 @@ class EMongoDB extends CApplicationComponent
      */
     public function setDbInstance($name)
     {
-        $this->_mongoDb = $this->getConnection()->selectDb($name);
+        $this->_mongoDb = $this->getConnection()->selectDB($name);
     }
 
     /**
@@ -231,6 +235,6 @@ class EMongoDB extends CApplicationComponent
     public function dropDb()
     {
         $result = $this->getDbInstance()->drop();
-        return isset($result) && 1 == $result['ok'];
+        return isset($result['ok']) && 1 == $result['ok'];
     }
 }

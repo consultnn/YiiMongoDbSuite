@@ -282,69 +282,100 @@ class EMongoCriteria extends CComponent
 		$this->_conditions = $conditions;
 	}
 
-	/**
-	 * @since v1.0
-	 */
-	public function getLimit()
-	{
-		return $this->_limit;
-	}
+    /**
+     * @since v1.0
+     * @return integer|null Limit if set
+     */
+    public function getLimit()
+    {
+        return $this->_limit;
+    }
 
-	/**
-	 * @since v1.0
-	 */
-	public function setLimit($limit)
-	{
-		$this->limit($limit);
-	}
+    /**
+     * Limit the number of results for a findAll query
+     *
+     * @param integer|null $limit Limit to set. Null for all
+     *
+     * @see limit()
+     * @since v1.0
+     */
+    public function setLimit($limit)
+    {
+        $this->limit($limit);
+    }
 
-	/**
-	 * @since v1.0
-	 */
-	public function getOffset()
-	{
-		return $this->_offset;
-	}
+    /**
+     * Get configured findAll query result offset
+     *
+     * @return integer|null
+     * @since v1.0
+     */
+    public function getOffset()
+    {
+        return $this->_offset;
+    }
 
-	/**
-	 * @since v1.0
-	 */
-	public function setOffset($offset)
-	{
-		$this->offset($offset);
-	}
+    /**
+     * Set result offset for a findAll query
+     *
+     * @param integer|null $limit Offset to set. Null for none
+     *
+     * @see offset()
+     * @since v1.0
+     */
+    public function setOffset($offset)
+    {
+        $this->offset($offset);
+    }
 
-	/**
-	 * @since v1.0
-	 */
-	public function getSort()
-	{
-		return $this->_sort;
-	}
+    /**
+     * Get sorted fields for a findAll query
+     *
+     * @return array|null Field => direction mapping, if set
+     * @since v1.0
+     */
+    public function getSort()
+    {
+        return $this->_sort;
+    }
 
-	/**
-	 * @since v1.0
-	 */
-	public function setSort(array $sort)
-	{
-		$this->_sort = $sort;
-	}
+    /**
+     * Set query result sorting
+     *
+     * @param array $sort Field => direction (SORT_ASC, SORT_DESC) mapping
+     *
+     * @see sort()
+     * @since v1.0
+     */
+    public function setSort(array $sort)
+    {
+        $this->_sort = $sort;
+    }
 
-	/**
-	 * @since v1.3.7
-	 */
-	public function getUseCursor()
-	{
-		return $this->_useCursor;
-	}
+    /**
+     * Get whether the specific cursor has been configured to use EMongoCursor
+     *
+     * @since v1.3.7
+     * @return boolean|null Boolean if explicitly set, or null if not configured
+     */
+    public function getUseCursor()
+    {
+        return $this->_useCursor;
+    }
 
-	/**
-	 * @since v1.3.7
-	 */
-	public function setUseCursor($useCursor)
-	{
-		$this->_useCursor = $useCursor;
-	}
+    /**
+     * Set flag of whether to return query results using EMongoCursor
+     *
+     * @param boolean|null $useCursor Whether or not to use EMongoCursor. If null,
+     *                                EMongoDocument will use fallback logic
+     *
+     * @see EMongoDocument::getUseCursor()
+     * @since v1.3.7
+     */
+    public function setUseCursor($useCursor)
+    {
+        $this->_useCursor = $useCursor;
+    }
 
 	/**
 	 * Return selected fields
@@ -357,23 +388,26 @@ class EMongoCriteria extends CComponent
 		return $this->_select;
 	}
 
-	/**
-	 * @since v1.3.1
-	 */
-	public function setSelect(array $select)
-	{
-		$this->_select = array();
-		// Convert the select array to field=>true/false format
-		foreach ($select as $key=>$value) {
-			if (is_int($key)) {
-				$this->_select[$value] = true;
-			}
-			else
-			{
-				$this->_select[$key] = $value;
-			}
-		}
-	}
+    /**
+     * Choose fields to be returned for a find/findAll query
+     *
+     * @param array $select Array of fields (either a indexed-array or
+     *                      'field' => boolean mapping)
+     *
+     * @since v1.3.1
+     */
+    public function setSelect(array $select)
+    {
+        $this->_select = array();
+        // Convert the select array to field=>true/false format
+        foreach ($select as $key => $value) {
+            if (is_int($key)) {
+                $this->_select[$value] = true;
+            } else {
+                $this->_select[$key] = $value;
+            }
+        }
+    }
 
 	/**
 	 * @since v1.3.1
@@ -391,100 +425,116 @@ class EMongoCriteria extends CComponent
 		$this->_workingFields = $select;
 	}
 
-	/**
-	 * List of fields to get from DB
-	 * Multiple calls to this method will merge all given fields
-	 *
-	 * @param array $fieldList list of fields to select
-	 * @since v1.0
-	 */
-	public function select(array $fieldList=null)
-	{
-		if($fieldList!==null)
-			$this->setSelect(array_merge($this->_select, $fieldList));
-		return $this;
-	}
+    /**
+     * List of fields to get from DB
+     * Multiple calls to this method will merge all given fields
+     *
+     * @param array $fieldList list of fields to select
+     *
+     * @return EMongoCriteria Current object
+     * @since v1.0
+     */
+    public function select(array $fieldList = null)
+    {
+        if (null !== $fieldList) {
+            $this->setSelect(array_merge($this->_select, $fieldList));
+        }
 
-	/**
-	 * Set linit
-	 * Multiple calls will overrride previous value of limit
-	 *
-	 * @param integer $limit limit
-	 * @since v1.0
-	 */
-	public function limit($limit)
-	{
-		$this->_limit = intval($limit);
-		return $this;
-	}
+        return $this;
+    }
 
-	/**
-	 * Set offset
-	 * Multiple calls will override previous value
-	 *
-	 * @param integer $offset offset
-	 * @since v1.0
-	 */
-	public function offset($offset)
-	{
-		$this->_offset = intval($offset);
-		return $this;
-	}
+    /**
+     * Set linit
+     * Multiple calls will overrride previous value of limit
+     *
+     * @param integer $limit limit
+     *
+     * @return EMongoCriteria Current object
+     * @since v1.0
+     */
+    public function limit($limit)
+    {
+        $this->_limit = intval($limit);
 
-	/**
-	 * Add sorting, avaliabe orders are: EMongoCriteria::SORT_ASC and EMongoCriteria::SORT_DESC
-	 * Each call will be groupped with previous calls
-	 * @param string $fieldName
-	 * @param integer $order
-	 * @since v1.0
-	 */
-	public function sort($fieldName, $order)
-	{
-		$this->_sort[$fieldName] = intval($order);
-		return $this;
-	}
+        return $this;
+    }
 
-	/**
-	 * Add condition
-	 * If specified field already has a condition, values will be merged
-	 * duplicates will be overriden by new values!
-	 * @param string $fieldName
-	 * @param string $op operator
-	 * @param mixed $value
-	 * @since v1.0
-	 */
-	public function addCond($fieldName, $op, $value)
-	{
-		$op = self::$operators[$op];
+    /**
+     * Set offset
+     * Multiple calls will override previous value
+     *
+     * @param integer $offset offset
+     *
+     * @return EMongoCriteria Current object
+     * @since v1.0
+     */
+    public function offset($offset)
+    {
+        $this->_offset = intval($offset);
 
-		if($op == self::$operators['or'])
-		{
-			if(!isset($this->_conditions[$op]))
-			{
-				$this->_conditions[$op] = array();
-			}
-			$this->_conditions[$op][] = array($fieldName=>$value);
-		} else {
+        return $this;
+    }
 
-			if(!isset($this->_conditions[$fieldName]) && $op != self::$operators['equals'])
-				$this->_conditions[$fieldName] = array();
+    /**
+     * Add sorting, avaliabe orders are: EMongoCriteria::SORT_ASC and EMongoCriteria::SORT_DESC
+     * Each call will be groupped with previous calls
+     *
+     * @param string  $fieldName Field name to sort on
+     * @param integer $order     Direction (see SORT_ASC and SORT_DESC)
+     *
+     * @return EMongoCriteria Current object
+     * @since v1.0
+     */
+    public function sort($fieldName, $order)
+    {
+        $this->_sort[$fieldName] = intval($order);
 
-			if($op != self::$operators['equals'])
-			{
-				if(
-					!is_array($this->_conditions[$fieldName]) ||
-					count(array_diff(array_keys($this->_conditions[$fieldName]), array_values(self::$operators))) > 0
-				)
-				{
-					$this->_conditions[$fieldName] = array();
-				}
-				$this->_conditions[$fieldName][$op] = $value;
-			}
-			else
-				$this->_conditions[$fieldName] = $value;
-		}
-		return $this;
-	}
+        return $this;
+    }
+
+    /**
+     * Add condition
+     * If specified field already has a condition, values will be merged
+     * duplicates will be overriden by new values!
+     *
+     * @param string $fieldName Field name for condition.
+     * @param string $op        operator {@see $operators}
+     * @param mixed  $value     Value to compare
+     *
+     * @return EMongoCriteria Current object
+     * @see __call() Sets working fields before calling this method
+     * @since v1.0
+     */
+    public function addCond($fieldName, $op, $value)
+    {
+        $op = self::$operators[$op];
+
+        if ($op == self::$operators['or']) {
+            if (!isset($this->_conditions[$op])) {
+                $this->_conditions[$op] = array();
+            }
+            $this->_conditions[$op][] = array($fieldName=>$value);
+        } else {
+            if (!isset($this->_conditions[$fieldName])
+                && $op != self::$operators['equals']
+            ) {
+                $this->_conditions[$fieldName] = array();
+            }
+
+            if ($op != self::$operators['equals']) {
+                if (!is_array($this->_conditions[$fieldName])
+                    || count(array_diff(array_keys($this->_conditions[$fieldName]), array_values(self::$operators))) > 0
+                ) {
+                    $this->_conditions[$fieldName] = array();
+                }
+                $this->_conditions[$fieldName][$op] = $value;
+            } else {
+                $this->_conditions[$fieldName] = $value;
+            }
+        }
+
+        return $this;
+    }
 
     /**
      * Generate a MongoDB query string based on the given criteria.

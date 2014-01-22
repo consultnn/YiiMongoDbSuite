@@ -115,15 +115,18 @@ abstract class EMongoEmbeddedDocument extends CModel
 		$this->raiseEvent('onAfterToArray', $event);
 	}
 
-	/**
-	 * @since v1.0.8
-	 */
-	protected function beforeToArray()
-	{
-		$event = new CModelEvent($this);
-		$this->onBeforeToArray($event);
-		return $event->isValid;
-	}
+    /**
+     * Method to determine whether an array conversion should be allowed to continue
+     *
+     * @since v1.0.8
+     * @return boolean Whether the array conversion should continue.
+     */
+    protected function beforeToArray()
+    {
+        $event = new CModelEvent($this);
+        $this->onBeforeToArray($event);
+        return $event->isValid;
+    }
 
 	/**
 	 * @since v1.0.8
@@ -133,15 +136,19 @@ abstract class EMongoEmbeddedDocument extends CModel
 		$this->onAfterToArray(new CModelEvent($this));
 	}
 
-	/**
-	 * @since v1.0.8
-	 */
-	protected function beforeEmbeddedDocsInit()
-	{
-		$event=new CModelEvent($this);
-		$this->onBeforeEmbeddedDocsInit($event);
-		return $event->isValid;
-	}
+    /**
+     * Method to determine whether a call to initialize embedded documents should be
+     * allowed to continue.
+     *
+     * @since v1.0.8
+     * @return boolean Whether the embeddedDocsInit event should be preformed
+     */
+    protected function beforeEmbeddedDocsInit()
+    {
+        $event = new CModelEvent($this);
+        $this->onBeforeEmbeddedDocsInit($event);
+        return $event->isValid;
+    }
 
 	/**
 	 * @since v1.0.8
@@ -222,53 +229,65 @@ abstract class EMongoEmbeddedDocument extends CModel
 			}
 	}
 
-	/**
-	 * @since v1.0.8
-	 */
-	public function embeddedDocuments()
-	{
-		return array();
-	}
+    /**
+     * Embedded document definitions. Defined as an array of name to class mapping.
+     *
+     * @example array('property' => 'EMongoEmbeddedDocumentClass')
+     * @since v1.0.8
+     * @return array
+     */
+    public function embeddedDocuments()
+    {
+        return array();
+    }
 
-	/**
-	 * @since v1.0.8
-	 */
-	public function hasEmbeddedDocuments()
-	{
-		if(isset(self::$_embeddedConfig[get_class($this)]))
-			return true;
-		return count($this->embeddedDocuments()) > 0;
-	}
+    /**
+     * Determine if this mjodel as defined embedded documents.
+     *
+     * @since v1.0.8
+     * @see embeddedDocuments()
+     * @return boolean Whether any embedded documents are configured for this model.
+     */
+    public function hasEmbeddedDocuments()
+    {
+        if (isset(self::$_embeddedConfig[get_class($this)])) {
+            return true;
+        }
 
-	/**
-	 * Returns the list of attribute names.
-	 * By default, this method returns all public properties of the class.
-	 * You may override this method to change the default.
-	 * @return array list of attribute names. Defaults to all public properties of the class.
-	 * @since v1.0.8
-	 */
-	public function attributeNames()
-	{
-		$className=get_class($this);
-		if(!isset(self::$_attributes[$className]))
-		{
-			$class=new ReflectionClass(get_class($this));
-			$names=array();
-			foreach($class->getProperties() as $property)
-			{
-				$name=$property->getName();
-				if($property->isPublic() && !$property->isStatic())
-					$names[]=$name;
-			}
-			if($this->hasEmbeddedDocuments())
-			{
-				$names = array_merge($names, array_keys(self::$_embeddedConfig[get_class($this)]));
-			}
-			return self::$_attributes[$className]=$names;
-		}
-		else
-			return self::$_attributes[$className];
-	}
+        return count($this->embeddedDocuments()) > 0;
+    }
+
+    /**
+     * Returns the list of attribute names.
+     * By default, this method returns all public properties of the class and any
+     * configured embedded documents.
+     * You may override this method to change the default.
+     *
+     * @return array list of attribute names. Defaults to all public properties of the class.
+     * @since v1.0.8
+     */
+    public function attributeNames()
+    {
+        $className = get_class($this);
+        if (!isset(self::$_attributes[$className])) {
+            $class = new ReflectionClass($className);
+            $names = array();
+            foreach ($class->getProperties() as $property) {
+                $name = $property->getName();
+                if ($property->isPublic() && !$property->isStatic()) {
+                    $names[] = $name;
+                }
+            }
+            if ($this->hasEmbeddedDocuments()) {
+                $names = array_merge(
+                    $names, array_keys(self::$_embeddedConfig[$className])
+                );
+            }
+            self::$_attributes[$className] = $names;
+        }
+
+        return self::$_attributes[$className];
+    }
 
 	/**
 	 * Returns the given object as an associative array
@@ -317,28 +336,27 @@ abstract class EMongoEmbeddedDocument extends CModel
         return $arr;
     }
 
-	/**
-	 * Return owner of this document
-	 * @return EMongoEmbeddedDocument
-	 * @since v1.0.8
-	 */
-	public function getOwner()
-	{
-		if($this->_owner!==null)
-			return $this->_owner;
-		else
-			return null;
-	}
+    /**
+     * Return owner of this document if one has been set
+     *
+     * @return EMongoEmbeddedDocument|null Owner object
+     * @since v1.0.8
+     */
+    public function getOwner()
+    {
+        return $this->_owner;
+    }
 
-	/**
-	 * Set owner of this document
-	 * @param EMongoEmbeddedDocument $owner
-	 * @since v1.0.8
-	 */
-	public function setOwner(EMongoEmbeddedDocument $owner)
-	{
-		$this->_owner = $owner;
-	}
+    /**
+     * Set owner of this document
+     *
+     * @param EMongoEmbeddedDocument $owner
+     * @since v1.0.8
+     */
+    public function setOwner(EMongoEmbeddedDocument $owner)
+    {
+        $this->_owner = $owner;
+    }
 
 	/**
 	 * Override default seScenario method for populating to embedded records
@@ -396,11 +414,12 @@ abstract class EMongoEmbeddedDocument extends CModel
     public function getAttributes($names = null)
     {
         $values = array();
+        $embeddedDocs = $this->embeddedDocuments();
         foreach ($this->attributeNames() as $name) {
             // Check if attribute is an embedded document and whether it has a value
             // or not
-            if (! array_key_exists($name, $this->embeddedDocuments())
-                || (array_key_exists($name, $this->embeddedDocuments())
+            if (! array_key_exists($name, $embeddedDocs)
+                || (array_key_exists($name, $embeddedDocs)
                 && null !== $this->_embedded->itemAt($name))
             ) {
                 $values[$name] = $this->$name;

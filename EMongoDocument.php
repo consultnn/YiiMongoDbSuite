@@ -770,7 +770,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      *
      * @return boolean whether the update is successful
      *
-     * @throws CException                  if the record is new
+     * @throws CDbException                if the record is new
      * @throws EMongoException             on fail of update
      * @throws MongoCursorException        on fail of update, when safe flag is set
      *                                     to true
@@ -783,7 +783,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         if ($this->getIsNewRecord()) {
             throw new CDbException(
                 Yii::t(
-                    'yii','The EMongoDocument cannot be updated because it is new.'
+                    'yii', 'The EMongoDocument cannot be updated because it is new.'
                 )
             );
         }
@@ -899,7 +899,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      * @param EMongoCriteria $criteria condition to limit updating rules
      *
      * @since v1.3.6
-     * @return bool
+     * @return boolean if the update command was successful
      */
     public function updateAll($modifier, $criteria = null)
     {
@@ -949,46 +949,48 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         return $result;
     }
 
-	/**
-	 * Deletes the row corresponding to this EMongoDocument.
-	 * @return boolean whether the deletion is successful.
-	 * @throws CException if the record is new
-	 * @since v1.0
-	 */
-	public function delete()
-	{
-		if(!$this->getIsNewRecord())
-		{
-			Yii::trace(get_class($this).'.delete()','ext.MongoDb.EMongoDocument');
-			if($this->beforeDelete())
-			{
-				$result = $this->deleteByPk($this->getPrimaryKey());
+    /**
+     * Deletes the row corresponding to this EMongoDocument.
+     *
+     * @return boolean      Whether the deletion is successful.
+     * @throws CDbException if the record is new
+     * @since v1.0
+     */
+    public function delete()
+    {
+        if ($this->getIsNewRecord()) {
+            throw new CDbException(
+                Yii::t(
+                    'yii', 'The EMongoDocument cannot be deleted because it is new.'
+                )
+            );
+        }
+        Yii::trace(get_class($this) . '.delete()', 'ext.MongoDb.EMongoDocument');
+        if ($this->beforeDelete()) {
+            $result = $this->deleteByPk($this->getPrimaryKey());
 
-				if($result !== false)
-				{
-					$this->afterDelete();
-					$this->setIsNewRecord(true);
-					return true;
-				}
-				else
-					return false;
-			}
-			else
-				return false;
-		}
-		else
-			throw new CDbException(Yii::t('yii','The EMongoDocument cannot be deleted because it is new.'));
-	}
+            if ($result !== false) {
+                $this->afterDelete();
+                $this->setIsNewRecord(true);
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
 
     /**
      * Deletes document with the specified primary key.
      * See {@link findByPk()} for detailed explanation about $pk and $criteria.
      *
-     * @param mixed $pk primary key value(s). Use array for multiple primary keys.
-     *                  For composite key, each key value must be an array (column
-     *                  name=>column value).
-     * @param array|EMongoCriteria $condition query criteria.
+     * @param mixed                $pk       Primary key value(s). For composite
+     *                                       key, each key value must be an array
+     *                                       (field name => field value).
+     * @param array|EMongoCriteria $criteria Additional query criteria.
      *
+     * @return boolean Whether the delete was successful
      * @since v1.0
      */
     public function deleteByPk($pk, $criteria = null)
@@ -1113,7 +1115,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      * {@link EMongoCriteria} object; Otherwise, it should be an instance of
      * {@link EMongoCriteria}.
      *
-     * @return EMongoDocument the record found. Null if no record is found.
+     * @return EMongoDocument|null the record found. Null if no record is found.
      * @since v1.0
      */
     public function find($criteria = null)
@@ -1161,8 +1163,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      *
      * @param array|EMongoCriteria $criteria query criteria.
      *
-     * @return array list of documents satisfying the specified condition. An empty
-     *               array is returned if none is found.
+     * @return EMongoDocument[]|EMongoCursor All documents found or a cursor if
+     *                                       {@link getUseCursor()} is true
      * @since v1.0
      */
     public function findAll($criteria = null)
@@ -1245,83 +1247,94 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         return $cursor;
     }
 
-	/**
-	 * Finds document with the specified primary key.
-	 * In MongoDB world every document has '_id' unique field, so with this method that
-	 * field is in use as PK!
-	 * See {@link find()} for detailed explanation about $condition.
-	 * @param mixed $pk primary key value(s). Use array for multiple primary keys. For composite key, each key value must be an array (column name=>column value).
-	 * @param array|EMongoCriteria $condition query criteria.
-	 * @return the document found. An null is returned if none is found.
-	 * @since v1.0
-	 */
-	public function findByPk($pk, $criteria=null)
-	{
-		Yii::trace(get_class($this).'.findByPk()','ext.MongoDb.EMongoDocument');
-		$criteria = new EMongoCriteria($criteria);
-		$criteria->mergeWith($this->createPkCriteria($pk));
+    /**
+     * Finds document with the specified primary key.
+     * In MongoDB world every document has '_id' unique field, so with this method
+     * that field is in use as PK!
+     * See {@link find()} for detailed explanation about $criteria.
+     *
+     * @param mixed                $pk       Primary key value(s). For composite
+     *                                       key, each key value must be an array
+     *                                       (column name => column value).
+     * @param array|EMongoCriteria $criteria Additional query criteria.
+     *
+     * @return EMongoDocument|null The document found. Null is returned if none is
+     *                             found.
+     * @since v1.0
+     */
+    public function findByPk($pk, $criteria = null)
+    {
+        Yii::trace(get_class($this) . '.findByPk()', 'ext.MongoDb.EMongoDocument');
+        $criteria = new EMongoCriteria($criteria);
+        $criteria->mergeWith($this->createPkCriteria($pk));
 
-		return $this->find($criteria);
-	}
+        return $this->find($criteria);
+    }
 
-	/**
-	 * Finds all documents with the specified primary keys.
-	 * In MongoDB world every document has '_id' unique field, so with this method that
-	 * field is in use as PK by default.
-	 * See {@link find()} for detailed explanation about $condition.
-	 * @param mixed $pk primary key value(s). Use array for multiple primary keys. For composite key, each key value must be an array (column name=>column value).
-	 * @param array|EMongoCriteria $condition query criteria.
-	 * @return the document found. An null is returned if none is found.
-	 * @since v1.0
-	 */
-	public function findAllByPk($pk, $criteria=null)
-	{
-		Yii::trace(get_class($this).'.findAllByPk()','ext.MongoDb.EMongoDocument');
-		$criteria = new EMongoCriteria($criteria);
-		$criteria->mergeWith($this->createPkCriteria($pk, true));
+    /**
+     * Finds all documents with the specified primary keys.
+     * In MongoDB world every document has '_id' unique field, so with this method
+     * that field is in use as PK by default.
+     * See {@link find()} for detailed explanation about $condition.
+     *
+     * @param mixed                $pk       Primary key value(s). Use array for
+     *                                       multiple primary keys. For composite
+     *                                       key, each key value must be an array
+     *                                       (column name => column value).
+     * @param array|EMongoCriteria $criteria query criteria.
+     *
+     * @return EMongoDocument[]|EMongoCursor All documents found or a cursor if
+     *                                       {@link getUseCursor()} is true
+     * @since v1.0
+     */
+    public function findAllByPk($pk, $criteria = null)
+    {
+        Yii::trace(get_class($this) . '.findAllByPk()', 'ext.MongoDb.EMongoDocument');
+        $criteria = new EMongoCriteria($criteria);
+        $criteria->mergeWith($this->createPkCriteria($pk, true));
 
-		return $this->findAll($criteria);
-	}
+        return $this->findAll($criteria);
+    }
 
-	/**
-	 * Finds document with the specified attributes.
-	 *
-	 * See {@link find()} for detailed explanation about $condition.
-	 * @param mixed $pk primary key value(s). Use array for multiple primary keys. For composite key, each key value must be an array (column name=>column value).
-	 * @param array|EMongoCriteria $condition query criteria.
-	 * @return the document found. An null is returned if none is found.
-	 * @since v1.0
-	 */
-	public function findByAttributes(array $attributes)
-	{
-		$criteria = new EMongoCriteria();
-		foreach($attributes as $name=>$value)
-		{
-			$criteria->$name('==', $value);
-		}
+    /**
+     * Finds a document with the specified attributes.
+     *
+     * @param array $attributes Query criteria. Should be in the format
+     *                          (field name => field value).
+     *
+     * @return EMongoDocument|null The document found. Null is returned if none
+     *                             found.
+     * @since v1.0
+     */
+    public function findByAttributes(array $attributes)
+    {
+        $criteria = new EMongoCriteria();
+        foreach ($attributes as $name => $value) {
+            $criteria->$name('==', $value);
+        }
 
-		return $this->find($criteria);
-	}
+        return $this->find($criteria);
+    }
 
-	/**
-	 * Finds all documents with the specified attributes.
-	 *
-	 * See {@link find()} for detailed explanation about $condition.
-	 * @param mixed $pk primary key value(s). Use array for multiple primary keys. For composite key, each key value must be an array (column name=>column value).
-	 * @param array|EMongoCriteria $condition query criteria.
-	 * @return the document found. An null is returned if none is found.
-	 * @since v1.0
-	 */
-	public function findAllByAttributes(array $attributes)
-	{
-		$criteria = new EMongoCriteria();
-		foreach($attributes as $name=>$value)
-		{
-			$criteria->$name('==', $value);
-		}
+    /**
+     * Finds all documents with the specified attributes.
+     *
+     * @param array $attributes Query criteria. Should be in the format
+     *                          (field name => field value).
+     *
+     * @return EMongoDocument[]|EMongoCursor All documents found or a cursor if
+     *                                       {@link getUseCursor()} is true
+     * @since v1.0
+     */
+    public function findAllByAttributes(array $attributes)
+    {
+        $criteria = new EMongoCriteria();
+        foreach ($attributes as $name => $value) {
+            $criteria->$name('==', $value);
+        }
 
-		return $this->findAll($criteria);
-	}
+        return $this->findAll($criteria);
+    }
 
     /**
      * Counts all documents satisfying the specified condition.
@@ -1683,72 +1696,90 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 			return null;
 	}
 
-	/**
-	 * Creates a list of documents based on the input data.
-	 * This method is internally used by the find methods.
-	 * @param array $data list of attribute values for the active records.
-	 * @param boolean $callAfterFind whether to call {@link afterFind} after each record is populated.
-	 * This parameter is added in version 1.0.3.
-	 * @param string $index the name of the attribute whose value will be used as indexes of the query result array.
-	 * If null, it means the array will be indexed by zero-based integers.
-	 * @return array list of active records.
-	 * @since v1.0
-	 */
-	public function populateRecords($data, $callAfterFind=true, $index=null)
-	{
-		$records=array();
-		foreach($data as $attributes)
-		{
-			if(($record=$this->populateRecord($attributes,$callAfterFind))!==null)
-			{
-				if($index===null)
-					$records[]=$record;
-				else
-					$records[$record->$index]=$record;
-			}
-		}
-		return $records;
-	}
+    /**
+     * Creates a list of documents based on the input data.
+     * This method is internally used by the find methods.
+     *
+     * @param array   $data          List of attribute values for the active records
+     * @param boolean $callAfterFind Whether to call {@link afterFind} after each
+     *                               record is populated. This parameter is added in
+     *                               version 1.0.3.
+     * @param string  $index         The name of the attribute whose value will be
+     *                               used as indexes of the query result array. If
+     *                               null, it means the array will be indexed by
+     *                               zero-based integers.
+     *
+     * @return EMongoDocument[] Array of active records.
+     * @since v1.0
+     */
+    public function populateRecords($data, $callAfterFind = true, $index = null)
+    {
+        $records = array();
+        foreach ($data as $attributes) {
+            $record = $this->populateRecord($attributes, $callAfterFind);
+            if (null !== $record) {
+                if (null === $index) {
+                    $records[] = $record;
+                } else {
+                    $records[$record->$index] = $record;
+                }
+            }
+        }
 
-	/**
-	 * Magic search method, provides basic search functionality.
-	 *
-	 * Returns EMongoDocument object ($this) with criteria set to
-	 * rexexp: /$attributeValue/i
-	 * used for Data provider search functionality
-	 * @param boolean $caseSensitive whathever do a case-sensitive search, default to false
-	 * @return EMongoDocument
-	 * @since v1.2.2
-	 */
-	public function search($caseSensitive = false)
-	{
-		$criteria = $this->getDbCriteria();
+        return $records;
+    }
 
-		foreach($this->getSafeAttributeNames() as $attribute)
-		{
-			if($this->$attribute !== null && $this->$attribute !== '')
-			{
-				if(is_array($this->$attribute) || is_object($this->$attribute))
-					$criteria->$attribute = $this->$attribute;
-				else if(preg_match('/^(?:\s*(<>|<=|>=|<|>|=|!=|==))?(.*)$/',$this->$attribute,$matches))
-				{
-					$op = $matches[1];
-					$value = $matches[2];
+    /**
+     * Magic search method, provides basic search functionality.
+     *
+     * Returns EMongoDocument objects with criteria set to
+     * rexexp: /$attributeValue/i
+     * Used for Data provider search functionality
+     *
+     * @param boolean $caseSensitive Whether do a case-sensitive search, default to false
+     *
+     * @return EMongoDocumentDataProvider Provider with results
+     * @since v1.2.2
+     */
+    public function search($caseSensitive = false)
+    {
+        $criteria = $this->getDbCriteria();
+        $opRegex = '/^(?:\s*(<>|<=|>=|<|>|=|!=|==))?(.*)$/';
 
-					if($op === '=') $op = '==';
+        foreach ($this->getSafeAttributeNames() as $attribute) {
+            if (null !== $this->$attribute && '' !== $this->$attribute) {
+                if (is_array($this->$attribute) || is_object($this->$attribute)) {
+                    $criteria->$attribute = $this->$attribute;
+                } elseif (preg_match($opRegex, $this->$attribute, $matches)) {
+                    $op = $matches[1];
+                    $value = $matches[2];
 
-					if($op !== '')
-						call_user_func(array($criteria, $attribute), $op, is_numeric($value) ? floatval($value) : $value);
-					else
-						$criteria->$attribute = new MongoRegex($caseSensitive ? '/'.$this->$attribute.'/' : '/'.$this->$attribute.'/i');
-				}
-			}
-		}
+                    if ($op === '=') {
+                        $op = '==';
+                    }
 
-		$this->setDbCriteria($criteria);
+                    if ($op !== '') {
+                        // Call magic setter on EMongoCriteria
+                        call_user_func(
+                            array($criteria, $attribute),
+                            $op,
+                            is_numeric($value) ? floatval($value) : $value
+                        );
+                    } else {
+                        $regex = new MongoRegex(
+                            '/' . preg_quote($this->$attribute, '/') . '/'
+                            . ($caseSensitive ? '' : 'i')
+                        );
+                        $criteria->$attribute = $regex;
+                    }
+                }
+            }
+        }
 
-		return new EMongoDocumentDataProvider($this);
-	}
+        $this->setDbCriteria($criteria);
+
+        return new EMongoDocumentDataProvider($this);
+    }
 
 	/**
 	 * Returns the static model of the specified EMongoDocument class.

@@ -271,9 +271,9 @@ abstract class EMongoGridFS extends EMongoDocument
      * @param boolean         $callAfterFind whether to call {@link afterFind} after
      *                                       the record is populated.
      *
-     * @return EMongoDocument|null the newly created document. The class of the
-     *                             object is the same as the model class. Null is
-     *                             returned if the input data is false.
+     * @return EMongoGridFS|null the newly created document. The class of the
+     *                           object is the same as the model class. Null is
+     *                           returned if the input data is false.
      * @since v1.3
      */
     public function populateRecord($document, $callAfterFind = true)
@@ -281,7 +281,7 @@ abstract class EMongoGridFS extends EMongoDocument
         Yii::trace(
             get_class($this) . '.populateRecord()', 'ext.MongoDb.EMongoGridFS'
         );
-        if($document instanceof MongoGridFSFile) {
+        if ($document instanceof MongoGridFSFile) {
             $model = parent::populateRecord($document->file, $callAfterFind);
             $model->_gridFSFile = $document;
             return $model;

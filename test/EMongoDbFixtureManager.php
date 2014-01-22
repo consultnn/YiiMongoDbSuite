@@ -82,21 +82,29 @@ class EMongoDbFixtureManager extends CApplicationComponent
 		$this->prepare();
 	}
 
-	/**
-	 * Returns the database connection used to load fixtures.
-	 * @return MongoDb the database connection
-	 */
-	public function getDbConnection()
-	{
-		if($this->_mongoDb===null)
-		{
-			$this->_mongoDb=Yii::app()->getComponent($this->connectionID)->getDbInstance();
-			if(!$this->_mongoDb instanceof MongoDB)
-				throw new CException(Yii::t('yii','EMongoDbFixtureManager.connectionID "{id}" is invalid. Please make sure it refers to the ID of a CDbConnection application component.',
-					array('{id}'=>$this->connectionID)));
-		}
-		return $this->_mongoDb;
-	}
+    /**
+     * Returns the database connection used to load fixtures.
+     *
+     * @return MongoDB The database object
+     */
+    public function getDbConnection()
+    {
+        if (null === $this->_mongoDb) {
+            $this->_mongoDb = Yii::app()->getComponent($this->connectionID)
+                ->getDbInstance();
+            if (!$this->_mongoDb instanceof MongoDB) {
+                $message = Yii::t(
+                    'yii',
+                    'EMongoDbFixtureManager.connectionID "{id}" is invalid. Please '
+                    . 'make sure it refers to the ID of a EMongoDB application component.',
+                    array('{id}' => $this->connectionID)
+                );
+                throw new CException($message);
+            }
+        }
+
+        return $this->_mongoDb;
+    }
 
 	/**
 	 * Prepares the fixtures for the whole test.
@@ -269,41 +277,45 @@ class EMongoDbFixtureManager extends CApplicationComponent
 		}
 	}
 
-	/**
-	 * Returns the fixture data documents.
-	 * The documents will have updated primary key.
-	 * @param string $name the fixture name
-	 * @return array the fixture data documents. False is returned if there is no such fixture data.
-	 */
-	public function getRows($name)
-	{
-		if(isset($this->_rows[$name]))
-			return $this->_rows[$name];
-		else
-			return false;
-	}
+    /**
+     * Returns the fixture data documents.
+     * The documents will have updated primary key.
+     *
+     * @param string $name the fixture name
+     *
+     * @return array|false The fixture data documents. False is returned if there is
+     *                     no such fixture data.
+     */
+    public function getRows($name)
+    {
+        if (isset($this->_rows[$name])) {
+            return $this->_rows[$name];
+        } else {
+            return false;
+        }
+    }
 
-	/**
-	 * Returns the specified EMongoDocument instance in the fixture data.
-	 * @param string $name the fixture name
-	 * @param string $alias the alias for the fixture data document
-	 * @return EMongoDocument the MongoDocument instance. False is returned
-	 * if there is no such fixture document.
-	 */
-	public function getRecord($name,$alias)
-	{
-		if(isset($this->_records[$name][$alias]))
-		{
-			if(is_string($this->_records[$name][$alias]))
-			{
-				$row=$this->_rows[$name][$alias];
-				$model=EMongoDocument::model($this->_records[$name][$alias]);
-				$pk = $row['_id'];
-				$this->_records[$name][$alias]=$model->findByPk($pk);
-			}
-			return $this->_records[$name][$alias];
-		}
-		else
-			return false;
-	}
+    /**
+     * Returns the specified EMongoDocument instance in the fixture data.
+     *
+     * @param string $name  the fixture name
+     * @param string $alias the alias for the fixture data document
+     *
+     * @return EMongoDocument|false the EMongoDocument instance. False is returned
+     *                              if there is no such fixture document.
+     */
+    public function getRecord($name, $alias)
+    {
+        if (! isset($this->_records[$name][$alias])) {
+            return false;
+        }
+        if (is_string($this->_records[$name][$alias])) {
+            $row = $this->_rows[$name][$alias];
+            $model = EMongoDocument::model($this->_records[$name][$alias]);
+            $pk = $row['_id'];
+            $this->_records[$name][$alias] = $model->findByPk($pk);
+        }
+
+        return $this->_records[$name][$alias];
+    }
 }
