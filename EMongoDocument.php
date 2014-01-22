@@ -49,6 +49,12 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      */
     protected $ensureIndexes = false;
 
+    /**
+     * Whether to generate profiler log messages
+     * @var boolean
+     */
+    protected $enableProfiler = false;
+
 	/**
 	 * EMongoDB component static instance
 	 * @var EMongoDB $_emongoDb;
@@ -346,24 +352,43 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 		$this->useCursor = ($useCursor == true);
 	}
 
-	/**
-	 * Determine whether ensureIndexes() should be called on intialization
-	 * @return boolean
-	 */
-	public function getEnsureIndexes()
-	{
-		return $this->ensureIndexes;
-	}
+    /**
+     * Determine whether ensureIndexes() should be called on intialization
+     * @return boolean
+     */
+    public function getEnsureIndexes()
+    {
+        return $this->ensureIndexes;
+    }
 
-	/**
-	 * Set whether ensureIndexes() should be called on init.
-	 *
-	 * @param boolean $ensure Whether ensureIndexes() should be called on init()
-	 */
-	public function setEnsureIndexes($ensure)
-	{
-		$this->ensureIndexes = (boolean) $ensure;
-	}
+    /**
+     * Set whether ensureIndexes() should be called on init.
+     *
+     * @param boolean $ensure Whether ensureIndexes() should be called on init()
+     */
+    public function setEnsureIndexes($ensure)
+    {
+        $this->ensureIndexes = (boolean) $ensure;
+    }
+
+    /**
+     * Determine whether query profiling is enabled
+     * @return boolean
+     */
+    public function getEnableProfiler()
+    {
+        return $this->enableProfiler;
+    }
+
+    /**
+     * Set whether query profiling should be enabled.
+     *
+     * @param boolean $profiler Whether profiling should be set
+     */
+    public function setEnableProfiler($profiler)
+    {
+        $this->enableProfiler = (boolean) $profiler;
+    }
 
 	/**
 	 * Sets the attribute values in a massive way.
@@ -408,6 +433,14 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         if ($this->ensureIndexes
             && !isset(self::$_indexes[$this->getCollectionName()])
         ) {
+            $profile = $this->getEnableProfiler();
+            if ($profile) {
+                $profile = EMongoCriteria::commandToString(
+                    'getIndexes', $this->getCollectionName()
+                );
+                Yii::beginProfile($profile, 'system.db.EMongoDocument');
+            }
+
             try {
                 $indexInfo = $this->getCollection()->getIndexInfo();
             } catch (MongoException $e) {
@@ -417,6 +450,9 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                     CLogger::LEVEL_WARNING
                 );
                 $indexInfo = $this->getCollection()->getIndexInfo();
+            }
+            if ($profile) {
+                Yii::endProfile($profile, 'system.db.EMongoDocument');
             }
 
             array_shift($indexInfo); // strip out default _id index
@@ -457,6 +493,15 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 $indexParams = $index;
                 $indexParams['name'] = $name;
                 unset($indexParams['key']);
+
+                $profile = $this->getEnableProfiler();
+                if ($profile) {
+                    $profile = EMongoCriteria::commandToString(
+                        'ensureIndex', $this->getCollectionName(), $index['key'],
+                        $indexParams
+                    );
+                    Yii::beginProfile($profile, 'system.db.EMongoDocument');
+                }
                 try {
                     $this->getCollection()->ensureIndex(
                         $index['key'], $indexParams
@@ -471,6 +516,10 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                     $this->getCollection()->ensureIndex(
                         $index['key'], $indexParams
                     );
+                }
+
+                if ($profile) {
+                    Yii::endProfile($profile, 'system.db.EMongoDocument');
                 }
 
                 self::$_indexes[$this->getCollectionName()][$name] = $index;
@@ -658,6 +707,14 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             }
         }
 
+        $profile = $this->getEnableProfiler();
+        if ($profile) {
+            $profile = EMongoCriteria::commandToString(
+                'insert', $this->getCollectionName(), $rawData
+            );
+            Yii::beginProfile($profile, 'system.db.EMongoDocument');
+        }
+
         try {
             $result = $this->getCollection()->insert(
                 $rawData, array(
@@ -677,6 +734,10 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                     'safe'  => $this->getSafeFlag(),
                 )
             );
+        }
+
+        if ($profile) {
+            Yii::endProfile($profile, 'system.db.EMongoDocument');
         }
 
         if ($result !== false) { // strict comparison needed
@@ -744,13 +805,22 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             }
         }
 
+        $profile = $this->getEnableProfiler();
+
         if ($modify) {
             if (isset($rawData['_id'])) {
                 unset($rawData['_id']);
             }
+            if ($profile) {
+                $profile = EMongoCriteria::commandToString(
+                    'update', $this->getCollectionName(), $this->getPrimaryKey(),
+                    array('$set' => $rawData)
+                );
+                Yii::beginProfile($profile, 'system.db.EMongoDocument');
+            }
             try {
                 $result = $this->getCollection()->update(
-                    array('_id' => $this->_id),
+                    $this->getPrimaryKey(),
                     array('$set' => $rawData),
                     array(
                         'fsync'    => $this->getFsyncFlag(),
@@ -775,6 +845,12 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 );
             }
         } else {
+            if ($profile) {
+                $profile = EMongoCriteria::commandToString(
+                    'save', $this->getCollectionName(), $rawData
+                );
+                Yii::beginProfile($profile, 'system.db.EMongoDocument');
+            }
             try {
                 $result = $this->getCollection()->save(
                     $rawData,
@@ -797,6 +873,10 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                     )
                 );
             }
+        }
+
+        if ($profile) {
+            Yii::endProfile($profile, 'system.db.EMongoDocument');
         }
 
         if ($result !== false) { // strict comparison needed
@@ -829,6 +909,15 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         }
 
         $this->applyScopes($criteria);
+
+        $profile = $this->getEnableProfiler();
+        if ($profile) {
+            $profile = EMongoCriteria::commandToString(
+                'update', $this->getCollectionName(), $criteria->getConditions(),
+                $modifier->getModifiers(), array('multiple' => true)
+            );
+            Yii::beginProfile($profile, 'system.db.EMongoDocument');
+        }
         try {
             $result = $this->getCollection()->update(
                 $criteria->getConditions(),
@@ -910,6 +999,15 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         $this->applyScopes($criteria);
         $criteria->mergeWith($this->createPkCriteria($pk));
 
+        $profile = $this->getEnableProfiler();
+        if ($profile) {
+            $profile = EMongoCriteria::commandToString(
+                'remove', $this->getCollectionName(), $criteria->getConditions(),
+                true // justOne
+            );
+            Yii::beginProfile($profile, 'system.db.EMongoDocument');
+        }
+
         try {
             $result = $this->getCollection()->remove(
                 $criteria->getConditions(),
@@ -934,6 +1032,9 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 )
             );
         }
+        if ($profile) {
+            Yii::endProfile($profile, 'system.db.EMongoDocument');
+        }
 
         return $result;
     }
@@ -949,12 +1050,34 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
     public function refresh()
     {
         Yii::trace(get_class($this) . '.refresh()', 'ext.MongoDb.EMongoDocument');
-        if (!$this->getIsNewRecord()
-            && 1 == $this->getCollection()->count(array('_id' => $this->_id))
-        ) {
+        if ($this->getIsNewRecord()) {
+            return false;
+        }
+
+        $profile = $this->getEnableProfiler();
+        if ($profile) {
+            // Not an actual Mongo operation, so use class name instead of
+            // collection name
+            $profile = get_class($this) . '.refresh('
+                . EMongoCriteria::queryValueToString($this->getPrimaryKey()) . ')';
+            Yii::beginProfile($profile, 'system.db.EMongoDocument');
+        }
+        try {
+            $count = $this->getCollection()->count($this->getPrimaryKey());
+        } catch (MongoException $e) {
+            Yii::log(
+                'Failed to submit count for refresh(); retrying. ' . PHP_EOL
+                . 'Error: ' . $ex->getMessage(),
+                CLogger::LEVEL_WARNING
+            );
+
+            $count = $this->getCollection()->count($this->getPrimaryKey());
+        }
+
+        if (1 == $count) {
             try {
                 $this->setAttributes(
-                    $this->getCollection()->find(array('_id' => $this->_id)), false
+                    $this->getCollection()->findOne($this->getPrimaryKey()), false
                 );
             } catch (MongoException $ex) {
                 Yii::log(
@@ -963,12 +1086,18 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                     CLogger::LEVEL_WARNING
                 );
                 $this->setAttributes(
-                    $this->getCollection()->find(array('_id' => $this->_id)), false
+                    $this->getCollection()->findOne($this->getPrimaryKey()), false
                 );
+            }
+            if ($profile) {
+                Yii::endProfile($profile, 'system.db.EMongoDocument');
             }
 
             return true;
         } else {
+            if ($profile) {
+                Yii::endProfile($profile, 'system.db.EMongoDocument');
+            }
             return false;
         }
     }
@@ -994,6 +1123,13 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 
         $this->applyScopes($criteria);
 
+        $profile = $this->getEnableProfiler();
+        if ($profile) {
+            $profile = EMongoCriteria::findToString(
+                $criteria, false, $this->getCollectionName()
+            );
+            Yii::beginProfile($profile, 'system.db.EMongoDocument');
+        }
         try {
             $doc = $this->getCollection()->findOne(
                 $criteria->getConditions(), $criteria->getSelect()
@@ -1007,6 +1143,10 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             $doc = $this->getCollection()->findOne(
                 $criteria->getConditions(), $criteria->getSelect()
             );
+        }
+
+        if ($profile) {
+            Yii::endProfile($profile, 'system.db.EMongoDocument');
         }
 
         return $this->populateRecord($doc);
@@ -1032,6 +1172,14 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 
         $this->applyScopes($criteria);
 
+        $profile = $this->getEnableProfiler();
+        if ($profile) {
+            $profile = EMongoCriteria::findToString(
+                $criteria, true, $this->getCollectionName()
+            );
+            Yii::beginProfile($profile, 'system.db.EMongoDocument');
+        }
+
         $cursor = $this->getCursor($criteria);
 
         if ($this->getUseCursor($criteria)) {
@@ -1050,6 +1198,9 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 $cursor = $this->getCursor($criteria);
                 $return = $this->populateRecords($cursor);
             }
+        }
+        if ($profile) {
+            Yii::endProfile($profile, 'system.db.EMongoDocument');
         }
 
         return $return;
@@ -1184,6 +1335,14 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 
         $this->applyScopes($criteria);
 
+        $profile = $this->getEnableProfiler();
+        if ($profile) {
+            $profile = EMongoCriteria::commandToString(
+                'count', $this->getCollectionName(), $criteria->getConditions()
+            );
+            Yii::beginProfile($profile, 'system.db.EMongoDocument');
+        }
+
         try {
             $result = $this->getCollection()->count($criteria->getConditions());
         } catch (MongoException $ex) {
@@ -1193,6 +1352,9 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 CLogger::LEVEL_WARNING
             );
             $result = $this->getCollection()->count($criteria->getConditions());
+        }
+        if ($profile) {
+            Yii::endProfile($profile, 'system.db.EMongoDocument');
         }
 
         return $result;
@@ -1220,6 +1382,14 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 
         $this->applyScopes($criteria);
 
+        $profile = $this->getEnableProfiler();
+        if ($profile) {
+            $profile = EMongoCriteria::commandToString(
+                'count', $this->getCollectionName(), $criteria->getConditions()
+            );
+            Yii::beginProfile($profile, 'system.db.EMongoDocument');
+        }
+
         try {
             $result = $this->getCollection()->count($criteria->getConditions());
         } catch (MongoException $ex) {
@@ -1229,6 +1399,10 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 CLogger::LEVEL_WARNING
             );
             $result = $this->getCollection()->count($criteria->getConditions());
+        }
+
+        if ($profile) {
+            Yii::endProfile($profile, 'system.db.EMongoDocument');
         }
 
         return $result;
@@ -1248,6 +1422,15 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
     {
         Yii::trace(get_class($this).'.deleteAll()', 'ext.MongoDb.EMongoDocument');
         $this->applyScopes($criteria);
+
+        $profile = $this->getEnableProfiler();
+        if ($profile) {
+            $profile = EMongoCriteria::commandToString(
+                'remove', $this->getCollectionName(), $criteria->getConditions(),
+                false // justOne
+            );
+            Yii::beginProfile($profile, 'system.db.EMongoDocument');
+        }
 
         try {
             $result = $this->getCollection()->remove(
@@ -1270,6 +1453,10 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                     'safe'    => $this->getSafeFlag(),
                 )
             );
+        }
+
+        if ($profile) {
+            Yii::endProfile($profile, 'system.db.EMongoDocument');
         }
 
         return $result;

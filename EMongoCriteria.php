@@ -489,13 +489,13 @@ class EMongoCriteria extends CComponent
     /**
      * Generate a MongoDB query string based on the given criteria.
      *
-     * @param EMongoCriteria $criteria   Criteria for operation
-     * @param string         $operator   Operation that is being performed
+     * @param EMongoCriteria $criteria   Criteria for operation, or parameter
+     * @param boolean        $multiple   Flag indicating if find or findOne
      * @param string         $collection Collection operation is performed on
      *
      * @return string The generated MongoDb query string
      */
-    public static function toString(EMongoCriteria $criteria, $operator = 'find',
+    public static function findToString(EMongoCriteria $criteria, $multiple = true,
         $collection = null
     ) {
         if ($collection) {
@@ -503,7 +503,7 @@ class EMongoCriteria extends CComponent
         } else {
             $query = '';
         }
-        $query .= $operator . '(';
+        $query .= 'find' . ($multiple ? '' : 'One') . '(';
         $query .= self::queryValueToString($criteria->getConditions());
         $fields = $criteria->getSelect();
         if (! empty($fields)) {
@@ -511,7 +511,7 @@ class EMongoCriteria extends CComponent
         }
         $query .= ')';
         // Add fields valid only for cursors
-        if ('find' === $operator) {
+        if ($multiple) {
             if (array() !== $criteria->getSort()) {
                 $query .= '.sort(' . self::queryValueToString($criteria->getSort())
                 . ')';
@@ -523,6 +523,35 @@ class EMongoCriteria extends CComponent
                 $query .= '.skip(' . $criteria->getOffset() . ')';
             }
         }
+
+        return $query;
+    }
+
+    /**
+     * Generate a MongoDB query string based on the given criteria.
+     *
+     * @param string  $command    Operation that is being performed
+     * @param string  $collection Collection operation is performed on
+     * @param mixed   $params,... Additional parameters passed to command
+     *
+     * @return string The generated MongoDb query string
+     */
+    public static function commandToString($command, $collection = null)
+    {
+        if ($collection) {
+            $query = 'db.' . $collection . '.';
+        } else {
+            $query = 'db.';
+        }
+        $query .= $operator . '(';
+
+        $count = func_num_args();
+        if ($count > 2) {
+            for ($i = 3; $i < $count; $i++) {
+                $query .= ', ' . self::queryValueToString(func_get_arg($i));
+            }
+        }
+        $query .= ')';
 
         return $query;
     }
@@ -578,6 +607,6 @@ class EMongoCriteria extends CComponent
     public function __toString()
     {
         // Default to a find operation
-        return self::toString($this, 'find');
+        return self::findToString($this);
     }
 }

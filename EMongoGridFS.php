@@ -162,6 +162,13 @@ abstract class EMongoGridFS extends EMongoDocument
             $filename = $rawData['filename'];
             unset($rawData['filename']);
         }
+        $profile = $this->getEnableProfiler();
+        if ($profile) {
+            $profile = EMongoCriteria::commandToString(
+                'write', $this->getCollectionName(), $filename, $rawData
+            );
+            Yii::beginProfile($profile, 'system.db.EMongoGridFS');
+        }
 
         try {
             $result = $this->getCollection()->put($filename, $rawData);
@@ -173,9 +180,20 @@ abstract class EMongoGridFS extends EMongoDocument
             );
             $result = $this->getCollection()->put($filename, $rawData);
         }
-
+        if ($profile) {
+            Yii::endProfile($profile, 'system.db.EMongoGridFS');
+        }
         // strict comparsion driver may return empty array
         if ($result !== false) {
+            if ($profile) {
+                $criteria = new EMongoCriteria(
+                    array('conditions' => $this->getPrimaryKey())
+                );
+                $profile = EMongoCriteria::findToString(
+                    $criteria, false, $this->getCollectionName()
+                );
+                Yii::beginProfile($profile, 'system.db.EMongoGridFS');
+            }
             $this->_id = $result;
 
             try {
@@ -192,10 +210,13 @@ abstract class EMongoGridFS extends EMongoDocument
                     array('_id' => $this->_id)
                 );
             }
+            if ($profile) {
+                Yii::endProfile($profile, 'system.db.EMongoGridFS');
+            }
+
             $this->setIsNewRecord(false);
             $this->setScenario('update');
             $this->afterSave();
-
             return true;
         }
 

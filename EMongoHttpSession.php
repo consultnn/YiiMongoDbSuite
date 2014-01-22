@@ -67,6 +67,11 @@ class EMongoHttpSession extends CHttpSession
      */
     public $updateTimeout = null;
     /**
+     * Whether or not the query profiler should be enabled
+     * @var boolean
+     */
+    public $profiler = false;
+    /**
      * @var array insert options
      */
     private $_options;
@@ -115,6 +120,18 @@ class EMongoHttpSession extends CHttpSession
 
     protected function getData($id)
     {
+        if ($this->profiler) {
+            $criteria = new EMongoCriteria(
+                array(
+                    'conditions' => array($this->idColumn => $id),
+                    'select'     => array($this->dataColumn => true)
+                )
+            );
+            $profile = EMongoCriteria::findToString(
+                $criteria, false, $this->collectionName
+            );
+            Yii::beginProfile($profile, 'system.db.EMongoHttpSession');
+        }
         try {
             $data = $this->_collection->findOne(
                 array($this->idColumn => $id), array($this->dataColumn => true)
@@ -130,6 +147,9 @@ class EMongoHttpSession extends CHttpSession
             $data = $this->_collection->findOne(
                 array($this->idColumn => $id), array($this->dataColumn => true)
             );
+        }
+        if ($this->profiler && isset($profile)) {
+            Yii::endProfile($profile, 'system.db.EMongoHttpSession');
         }
 
         return $data;
@@ -196,6 +216,12 @@ class EMongoHttpSession extends CHttpSession
             $this->expireColumn => $this->getExipireTime(),
             $this->idColumn     => $id
         );
+        if ($this->profile) {
+            $profile = EMongoCriteria::commandToString(
+                'update', $this->collectionName, $data, array('upsert' => true)
+            );
+            Yii::beginProfile($profile, 'system.db.EMongoHttpSession');
+        }
         try {
             $result = $this->_collection->update(
                 array($this->idColumn => $id), $data, $options
@@ -212,6 +238,9 @@ class EMongoHttpSession extends CHttpSession
                 array($this->idColumn => $id), $data, $options
             );
         }
+        if ($this->profiler && isset($profile)) {
+            Yii::endProfile($profile, 'system.db.EMongoHttpSession');
+        }
 
         return $result;
     }
@@ -219,11 +248,19 @@ class EMongoHttpSession extends CHttpSession
     /**
      * Session destroy handler.
      * Do not call this method directly.
+     *
      * @param string $id session ID
+     *
      * @return boolean whether session is destroyed successfully
      */
     public function destroySession($id)
     {
+        if ($this->profile) {
+            $profile = EMongoCriteria::commandToString(
+                'remove', $this->collectionName, array($this->idColumn => $id)
+            );
+            Yii::beginProfile($profile, 'system.db.EMongoHttpSession');
+        }
         try {
             $result = $this->_collection->remove(
                 array($this->idColumn => $id), $this->_options
@@ -240,6 +277,9 @@ class EMongoHttpSession extends CHttpSession
                 array($this->idColumn => $id), $this->_options
             );
         }
+        if ($this->profiler && isset($profile)) {
+            Yii::endProfile($profile, 'system.db.EMongoHttpSession');
+        }
 
         return $result;
     }
@@ -248,16 +288,22 @@ class EMongoHttpSession extends CHttpSession
      * Session GC (garbage collection) handler.
      * Do not call this method directly.
      *
-     * @param integer $maxLifetime the number of seconds after which data will be seen as 'garbage' and cleaned up.
+     * @param integer $maxLifetime the number of seconds after which data will be
+     *                             seen as 'garbage' and cleaned up.
+     *
      * @return boolean whether session is GCed successfully
      */
     public function gcSession($maxLifetime)
     {
-        try {
-            $result = $this->_collection->remove(
-                array($this->expireColumn => array('$lt' => time())),
-                $this->_options
+        $query = array($this->expireColumn => array('$lt' => time()));
+        if ($this->profile) {
+            $profile = EMongoCriteria::commandToString(
+                'remove', $this->collectionName, $query
             );
+            Yii::beginProfile($profile, 'system.db.EMongoHttpSession');
+        }
+        try {
+            $result = $this->_collection->remove($query, $this->_options);
         } catch (MongoException $ex) {
             // Try again if switching master or timeout
             Yii::log(
@@ -266,10 +312,10 @@ class EMongoHttpSession extends CHttpSession
                 CLogger::LEVEL_WARNING
             );
 
-            $result = $this->_collection->remove(
-                array($this->expireColumn => array('$lt' => time())),
-                $this->_options
-            );
+            $result = $this->_collection->remove($query, $this->_options);
+        }
+        if ($this->profiler && isset($profile)) {
+            Yii::endProfile($profile, 'system.db.EMongoHttpSession');
         }
 
         return $result;
@@ -288,16 +334,19 @@ class EMongoHttpSession extends CHttpSession
         parent::regenerateID(false);
         $newId = session_id();
         $row = $this->getData($oldId);
-        if (is_null($row)) {
-            try {
-                $this->_collection->insert(
-                    array(
-                        $this->idColumn     => $newId,
-                        $this->expireColumn => $this->getExipireTime(),
-                    ),
-                    $this->_options
+        if (null === $row) {
+            $data = array(
+                $this->idColumn     => $newId,
+                $this->expireColumn => $this->getExipireTime(),
+            );
+            if ($this->profile) {
+                $profile = EMongoCriteria::commandToString(
+                    'insert', $this->collectionName, $data
                 );
-
+                Yii::beginProfile($profile, 'system.db.EMongoHttpSession');
+            }
+            try {
+                $this->_collection->insert($data, $this->_options);
             } catch (MongoException $e) {
                 // Try again if switching master or timeout
                 Yii::log(
@@ -306,15 +355,17 @@ class EMongoHttpSession extends CHttpSession
                     CLogger::LEVEL_WARNING
                 );
 
-                $this->_collection->insert(
-                    array(
-                        $this->idColumn     => $newId,
-                        $this->expireColumn => $this->getExipireTime(),
-                    ),
-                    $this->_options
-                );
+                $this->_collection->insert($data, $this->_options);
             }
         } elseif ($deleteOldSession && '_id' !== $this->idColumn) {
+            if ($this->profile) {
+                $profile = EMongoCriteria::commandToString(
+                    'update', $this->collectionName,
+                    array($this->idColumn => $oldId),
+                    array($this->idColumn => $newId)
+                );
+                Yii::beginProfile($profile, 'system.db.EMongoHttpSession');
+            }
             try {
                 $this->_collection->update(
                     array($this->idColumn => $oldId),
@@ -338,6 +389,12 @@ class EMongoHttpSession extends CHttpSession
         } else {
             unset($row['_id']); // unset before in case idColumn is _id
             $row[$this->idColumn] = $newId;
+            if ($this->profile) {
+                $profile = EMongoCriteria::commandToString(
+                    'insert', $this->collectionName, $row
+                );
+                Yii::beginProfile($profile, 'system.db.EMongoHttpSession');
+            }
             try {
                 $this->_collection->insert($row, $this->_options);
             } catch (MongoException $e) {
@@ -349,6 +406,10 @@ class EMongoHttpSession extends CHttpSession
                 );
                 $this->_collection->insert($row, $this->_options);
             }
+        }
+
+        if ($this->profiler && isset($profile)) {
+            Yii::endProfile($profile, 'system.db.EMongoHttpSession');
         }
     }
 
