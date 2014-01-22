@@ -75,7 +75,7 @@ abstract class EMongoGridFS extends EMongoDocument
      *
      * @return boolean whether the attributes are valid and the record is inserted
      *                 successfully.
-     * @throws CException if the record is not new
+     * @throws CDbException if the record is not new
      * @since v1.3
      */
     public function insert(array $attributes = null)
@@ -97,63 +97,8 @@ abstract class EMongoGridFS extends EMongoDocument
         if (empty($rawData['_id'])) {
             unset($rawData['_id']);
         }
-        // filter attributes if set in param
-        if (null !== $attributes) {
-            foreach ($rawData as $key => $value) {
-                if (!in_array($key, $attributes)) {
-                    unset($rawData[$key]);
-                }
-            }
-        }
-        // check file
-        $filename = "";
-        if (!array_key_exists('filename', $rawData)) {
-            throw new CException(Yii::t('yii', 'We need a filename'));
-        } else {
-            $filename = $rawData['filename'];
-            unset($rawData['filename']);
-        }
 
-        try {
-            $result = $this->getCollection()->put($filename, $rawData);
-        } catch (MongoException $ex) {
-            Yii::log(
-                'Failed to send put(); retrying: ' . PHP_EOL . 'Error: '
-                . $ex->getMessage(),
-                CLogger::LEVEL_WARNING
-            );
-            $result = $this->getCollection()->put($filename, $rawData);
-        }
-        // strict comparsion driver may return empty array
-        if ($result !== false)  {
-            $this->_id = $result;
-            //TODO: should be set in parent class
-            try {
-                $this->_gridFSFile = $this->getCollection()->findOne(
-                    array('_id' => $this->_id)
-                );
-            } catch (MongoException $ex) {
-                Yii::log(
-                    'Failed to send insert(); retrying: ' . PHP_EOL . 'Error: '
-                    . $ex->getMessage(),
-                    CLogger::LEVEL_WARNING
-                );
-                $this->_gridFSFile = $this->getCollection()->findOne(
-                    array('_id' => $this->_id)
-                );
-            }
-
-            $this->setIsNewRecord(false);
-            $this->setScenario('update');
-            $this->afterSave();
-            return true;
-        }
-
-        throw new CException(
-            Yii::t(
-                'yii', 'Can\t save document to disk, or try to save empty document!'
-            )
-        );
+        return $this->insertData($rawData, $attributes);
     }
 
     /**
@@ -162,7 +107,7 @@ abstract class EMongoGridFS extends EMongoDocument
      * @param MongoId $pk
      * @param array   $attributes
      *
-     * @throws CDbException
+     * @throws CDbException If PK is not a MongoId
      * @throws CException
      * @return boolean whether the insert success
      * @since v1.3
@@ -184,6 +129,22 @@ abstract class EMongoGridFS extends EMongoDocument
         $rawData = $this->toArray();
         $rawData['_id'] = $pk;
 
+        return $this->insertData($rawData, $attributes);
+    }
+
+    /**
+     * Consolidated logic for insert() and insertWithPk() for inserting a new GridFS
+     * document.
+     * Expects beforeSave() and method specific validation checks to be performed
+     * before calling this method.
+     *
+     * @param array      $rawData    Data to be saved (with filename)
+     * @param array|null $attributes Attributes to be filtered from raw data
+     *
+     * @return boolean Success of insert
+     */
+    protected function insertData(array $rawData, $attributes)
+    {
         // filter attributes if set in param
         if (null !== $attributes) {
             foreach ($rawData as $key => $value) {
@@ -192,6 +153,7 @@ abstract class EMongoGridFS extends EMongoDocument
                 }
             }
         }
+
         // check file
         $filename = "";
         if (!array_key_exists('filename', $rawData)) {
@@ -215,7 +177,7 @@ abstract class EMongoGridFS extends EMongoDocument
         // strict comparsion driver may return empty array
         if ($result !== false) {
             $this->_id = $result;
-            //TODO: should be set in parent class
+
             try {
                 $this->_gridFSFile = $this->getCollection()->findOne(
                     array('_id' => $this->_id)
@@ -253,12 +215,13 @@ abstract class EMongoGridFS extends EMongoDocument
      * @param array $attributes list of attributes that need to be saved. Defaults
      *                          to null, meaning all attributes that are loaded from
      *                          DB will be saved.
+     * @param bool  $modify     Ignored. Kept for compliance with parent definition
      *
      * @return boolean whether the update is successful
-     * @throws CException if the record is new
+     * @throws CDbException if the record is new
      * @since v1.3
      */
-    public function update(array $attributes = null)
+    public function update(array $attributes = null, $modify = true)
     {
         Yii::trace(get_class($this) . '.update()', 'ext.MongoDb.EMongoGridFS');
         if ($this->getIsNewRecord()) {
@@ -374,5 +337,30 @@ abstract class EMongoGridFS extends EMongoDocument
         } else {
             return false;
         }
+    }
+
+    /**
+     * Return underlying GridFS document.
+     * Method is protected to allow class to be extensible.
+     *
+     * @return MongoGridFSFile|null Document if loaded
+     */
+    protected function getGridFsFile()
+    {
+        return $this->_gridFSFile;
+    }
+
+
+    /**
+     * Set the underlying GridFS document.
+     * Method is protected to allow class to be extensible.
+     * Note: the MongoGridFSFile is currently only written to the database on insert
+     * or update if the file is persisted locally ({@see is_file()}).
+     *
+     * @param MongoGridFSFile $file MongoGridFsFile.
+     */
+    protected function setGridFsFile(MongoGridFSFile $file)
+    {
+        $this->_gridFSFile = $file;
     }
 }
