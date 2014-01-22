@@ -1584,4 +1584,29 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 
 		return $criteria;
 	}
+
+    /**
+     * This method does the actual convertion to an array.
+     * Ensures the primary key field(s) are included regardless of attributeNames().
+     *
+     * @see EMongoEmbeddedDocument::_toArray()
+     * @return array an associative array of the contents of this object
+     */
+    protected function _toArray()
+    {
+        $arr = parent::_toArray();
+
+        // Ensure the primary key is always included as it may not be in
+        // attributeNames
+        $pk = $this->primaryKey();
+        if (is_array($pk)) {
+            foreach ($pk as $attribute) {
+                $arr[$attribute] = $this->{$attribute};
+            }
+        } else {
+            $arr[$pk] = $this->{$pk};
+        }
+
+        return $arr;
+    }
 }

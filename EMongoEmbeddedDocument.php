@@ -29,7 +29,7 @@ abstract class EMongoEmbeddedDocument extends CModel
 	protected $_embedded=null;
 
 	/**
-	 * Cacheed values for embeddedDocuments() method vall
+	 * Cached values for embeddedDocuments() method
 	 * @var array $_embeddedConfig
 	 * @since v1.3.2
 	 */
@@ -288,28 +288,34 @@ abstract class EMongoEmbeddedDocument extends CModel
 			return array();
 	}
 
-	/**
-	 * This method does the actual convertion to an array
-	 * Does not fire any events
-	 * @return array an associative array of the contents of this object
-	 * @since v1.3.4
-	 */
-	protected function _toArray()
-	{
-		$arr = array();
-		$class=new ReflectionClass(get_class($this));
-		foreach($class->getProperties() as $property)
-		{
-			$name=$property->getName();
-			if($property->isPublic() && !$property->isStatic())
-				$arr[$name] = $this->$name;
-		}
-		if($this->hasEmbeddedDocuments())
-			foreach($this->_embedded as $key=>$value)
-				$arr[$key]=$value->toArray();
+    /**
+     * This method does the actual convertion to an array.
+     * Includes all defined attributes in {@link attributeNames()}. If an embedded
+     * document has not been loaded, it will have a return value of null.
+     * Does not fire any events.
+     *
+     * @return array an associative array of the contents of this object
+     * @since v1.3.4
+     */
+    protected function _toArray()
+    {
+        $arr = array();
+        $embeddedDocs = $this->embeddedDocuments();
+        foreach ($this->attributeNames() as $name) {
+            if (isset($embeddedDocs[$name])) {
+                // Only populate embedded document if not null
+                if (null !== $this->_embedded->itemAt($name)) {
+                    $arr[$name] = $this->_embedded[$name]->toArray();
+                } else {
+                    $arr[$name] = null;
+                }
+            } else {
+                $arr[$name] = $this->{$name};
+            }
+        }
 
-		return $arr;
-	}
+        return $arr;
+    }
 
 	/**
 	 * Return owner of this document
@@ -348,4 +354,85 @@ abstract class EMongoEmbeddedDocument extends CModel
 		}
 		parent::setScenario($value);
 	}
+
+    /**
+     * Validate current document and all embedded documents.
+     *
+     * @param array|null $attributes  Attributes to validate, or null for all
+     * @param boolean    $clearErrors Whether any previous errors should be cleared
+     *                                before performing validation.
+     *
+     * @return boolean Whether the model is considered valid for the given parameters
+     */
+    public function validate($attributes = null, $clearErrors = true)
+    {
+        $valid = parent::validate($attributes, $clearErrors);
+        if ($this->hasEmbeddedDocuments()) {
+            foreach (array_keys($this->embeddedDocuments()) as $attribute) {
+                if (null !== $this->_embedded->itemAt($attribute)
+                    && (null === $attributes || in_array($attribute, $attributes))
+                ) {
+                    $valid &= $this->$attribute->validate(null, $clearErrors);
+                    // Populate error message with embedded document messages
+                    if ($this->$attribute->hasErrors()) {
+                        $this->addErrors($this->$attribute->getErrors());
+                    }
+                }
+            }
+        }
+
+        return $valid;
+    }
+
+    /**
+     * Override parent getAttributes to ensure embedded documents without values are
+     * not created
+     *
+     * @param array|null $names Attribute names to include. (default null for all)
+     *
+     * @return array
+     * @see CModel::getAttributes()
+     */
+    public function getAttributes($names = null)
+    {
+        $values = array();
+        foreach ($this->attributeNames() as $name) {
+            // Check if attribute is an embedded document and whether it has a value
+            // or not
+            if (! array_key_exists($name, $this->embeddedDocuments())
+                || (array_key_exists($name, $this->embeddedDocuments())
+                && null !== $this->_embedded->itemAt($name))
+            ) {
+                $values[$name] = $this->$name;
+            } else {
+                $values[$name] = null;
+            }
+        }
+
+        if (is_array($names)) {
+            $values2 = array();
+            foreach ($names as $name) {
+                $values2[$name] = isset($values[$name]) ? $values[$name] : null;
+            }
+
+            return $values2;
+        } else {
+            return $values;
+        }
+    }
+
+    /**
+     * When de-serializing the document, ensure static variables are setup (embedded
+     * documents) and the model is initialized.
+     */
+    public function __wakeup()
+    {
+        // Ensure model setup
+        $this->init();
+
+        // Ensure the embedded document configuration is setup for this class
+        if (! isset(self::$_embeddedConfig[get_class($this)])) {
+            self::$_embeddedConfig[get_class($this)] = $this->embeddedDocuments();
+        }
+    }
 }
