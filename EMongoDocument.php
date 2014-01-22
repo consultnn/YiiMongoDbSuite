@@ -1210,7 +1210,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
     public function countByAttributes(array $attributes)
     {
         Yii::trace(
-            get_class($this).'.countByAttributes()','ext.MongoDb.EMongoDocument'
+            get_class($this) . '.countByAttributes()', 'ext.MongoDb.EMongoDocument'
         );
 
         $criteria = new EMongoCriteria;
