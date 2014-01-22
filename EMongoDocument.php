@@ -43,11 +43,11 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 
 	protected				$useCursor		= null;			// Whatever to return cursor instead on raw array
 
-	/**
-	 * @var boolean $ensureIndexes whatever to check and create non existing indexes of collection
-	 * @since v1.1
-	 */
-	protected				$ensureIndexes	= true;			// Whatever to ensure indexes
+    /**
+     * @var boolean $ensureIndexes whatever to check and create non existing indexes of collection
+     * @since v1.1
+     */
+    protected $ensureIndexes = false;
 
 	/**
 	 * EMongoDB component static instance
@@ -347,6 +347,25 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 	}
 
 	/**
+	 * Determine whether ensureIndexes() should be called on intialization
+	 * @return boolean
+	 */
+	public function getEnsureIndexes()
+	{
+		return $this->ensureIndexes;
+	}
+
+	/**
+	 * Set whether ensureIndexes() should be called on init.
+	 *
+	 * @param boolean $ensure Whether ensureIndexes() should be called on init()
+	 */
+	public function setEnsureIndexes($ensure)
+	{
+		$this->ensureIndexes = (boolean) $ensure;
+	}
+
+	/**
 	 * Sets the attribute values in a massive way.
 	 * @param array $values attribute values (name=>value) to be set.
 	 * @param boolean $safeOnly whether the assignments should only be done to the safe attributes.
@@ -375,35 +394,42 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 		parent::setAttributes($values, $safeOnly);
 	}
 
-	/**
-	 * This function check indexes and applies them to the collection if needed
-	 * see CModel::init()
-	 *
-	 * @see EMongoEmbeddedDocument::init()
-	 * @since v1.1
-	 */
-	public function init()
-	{
-		parent::init();
+    /**
+     * This function check indexes and applies them to the collection if needed
+     * see CModel::init()
+     *
+     * @see EMongoEmbeddedDocument::init()
+     * @since v1.1
+     */
+    public function init()
+    {
+        parent::init();
 
-		if($this->ensureIndexes && !isset(self::$_indexes[$this->getCollectionName()]))
-		{
-			$indexInfo = $this->getCollection()->getIndexInfo();
-			array_shift($indexInfo); // strip out default _id index
+        if ($this->ensureIndexes
+            && !isset(self::$_indexes[$this->getCollectionName()])
+        ) {
+            try {
+                $indexInfo = $this->getCollection()->getIndexInfo();
+            } catch (MongoException $e) {
+                Yii::log(
+                    'Failed to retreive index info; retrying. ' . PHP_EOL
+                    . 'Error: ' . $ex->getMessage(),
+                    CLogger::LEVEL_WARNING
+                );
+                $indexInfo = $this->getCollection()->getIndexInfo();
+            }
 
-			$indexes = array();
-			foreach($indexInfo as $index)
-			{
-				$indexes[$index['name']] = array(
-					'key'=>$index['key'],
-					'unique'=>isset($index['unique']) ? $index['unique'] : false,
-				);
-			}
-			self::$_indexes[$this->getCollectionName()] = $indexes;
+            array_shift($indexInfo); // strip out default _id index
 
-			$this->ensureIndexes();
-		}
-	}
+            $indexes = array();
+            foreach ($indexInfo as $index) {
+                $indexes[$index['name']] = $index;
+            }
+            self::$_indexes[$this->getCollectionName()] = $indexes;
+
+            $this->ensureIndexes();
+        }
+    }
 
 	/**
 	 * This function may return array of indexes for this collection
@@ -420,32 +446,37 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 		return array();
 	}
 
-	/**
-	 * @since v1.1
-	 */
-	private function ensureIndexes()
-	{
-		$indexNames = array_keys(self::$_indexes[$this->getCollectionName()]);
-		foreach($this->indexes() as $name=>$index)
-		{
-			if(!in_array($name, $indexNames))
-			{
-				if(version_compare(Mongo::VERSION, '1.0.2','>=') === true)
-				{
-					$this->getCollection()->ensureIndex(
-						$index['key'],
-						array('unique'=>isset($index['unique']) ? $index['unique'] : false, 'name'=>$name)
-					);
-				} else {
-					$this->getCollection()->ensureIndex(
-						$index['key'],
-						isset($index['unique']) ? $index['unique'] : false
-					);
-				}
-				self::$_indexes[$this->getCollectionName()][$name] = $index;
-			}
-		}
-	}
+    /**
+     * @since v1.1
+     */
+    private function ensureIndexes()
+    {
+        $indexNames = array_keys(self::$_indexes[$this->getCollectionName()]);
+        foreach ($this->indexes() as $name => $index) {
+            if (!in_array($name, $indexNames)) {
+                $indexParams = $index;
+                $indexParams['name'] = $name;
+                unset($indexParams['key']);
+                try {
+                    $this->getCollection()->ensureIndex(
+                        $index['key'], $indexParams
+                    );
+                } catch (MongoCursorException $e) {
+                    Yii::log(
+                        'Failed to ensureIndex(); retrying. ' . PHP_EOL
+                        . 'Error: ' . $ex->getMessage(),
+                        CLogger::LEVEL_WARNING
+                    );
+
+                    $this->getCollection()->ensureIndex(
+                        $index['key'], $indexParams
+                    );
+                }
+
+                self::$_indexes[$this->getCollectionName()][$name] = $index;
+            }
+        }
+    }
 
 	/**
 	 * Returns the declaration of named scopes.
