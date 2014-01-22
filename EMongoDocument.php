@@ -813,14 +813,14 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             }
             if ($profile) {
                 $profile = EMongoCriteria::commandToString(
-                    'update', $this->getCollectionName(), $this->getPrimaryKey(),
+                    'update', $this->getCollectionName(), array('_id' => $this->_id),
                     array('$set' => $rawData)
                 );
                 Yii::beginProfile($profile, 'system.db.EMongoDocument');
             }
             try {
                 $result = $this->getCollection()->update(
-                    $this->getPrimaryKey(),
+                    array('_id' => $this->_id),
                     array('$set' => $rawData),
                     array(
                         'fsync'    => $this->getFsyncFlag(),
@@ -1059,11 +1059,12 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             // Not an actual Mongo operation, so use class name instead of
             // collection name
             $profile = get_class($this) . '.refresh('
-                . EMongoCriteria::queryValueToString($this->getPrimaryKey()) . ')';
+                . EMongoCriteria::queryValueToString(array('_id' => $this->_id))
+                . ')';
             Yii::beginProfile($profile, 'system.db.EMongoDocument');
         }
         try {
-            $count = $this->getCollection()->count($this->getPrimaryKey());
+            $count = $this->getCollection()->count(array('_id' => $this->_id));
         } catch (MongoException $e) {
             Yii::log(
                 'Failed to submit count for refresh(); retrying. ' . PHP_EOL
@@ -1071,13 +1072,14 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 CLogger::LEVEL_WARNING
             );
 
-            $count = $this->getCollection()->count($this->getPrimaryKey());
+            $count = $this->getCollection()->count(array('_id' => $this->_id));
         }
 
         if (1 == $count) {
             try {
                 $this->setAttributes(
-                    $this->getCollection()->findOne($this->getPrimaryKey()), false
+                    $this->getCollection()->findOne(array('_id' => $this->_id)),
+                    false
                 );
             } catch (MongoException $ex) {
                 Yii::log(
@@ -1086,7 +1088,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                     CLogger::LEVEL_WARNING
                 );
                 $this->setAttributes(
-                    $this->getCollection()->findOne($this->getPrimaryKey()), false
+                    $this->getCollection()->findOne(array('_id' => $this->_id)),
+                    false
                 );
             }
             if ($profile) {
@@ -1776,32 +1779,38 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 		}
 	}
 
-	/**
-	 * @since v1.2.2
-	 */
-	private function createPkCriteria($pk, $multiple=false)
-	{
-		$pkField = $this->primaryKey();
-		$criteria = new EMongoCriteria();
 
-		if(is_string($pkField))
-		{
-			if(!$multiple)
-				$criteria->{$pkField} = $pk;
-			else
-				$criteria->{$pkField}('in', $pk);
-		}
-		else if(is_array($pkField))
-		{
-			if(!$multiple)
-				for($i=0; $i<count($pkField); $i++)
-					$criteria->{$pkField[$i]} = $pk[$i];
-			else
-				throw new EMongoException(Yii::t('yii', 'Cannot create PK criteria for multiple composite key\'s (not implemented yet)'));
-		}
+    /**
+     * @since v1.2.2
+     */
+    protected function createPkCriteria($pk, $multiple = false)
+    {
+        $pkField = $this->primaryKey();
+        $criteria = new EMongoCriteria();
 
-		return $criteria;
-	}
+        if (is_string($pkField)) {
+            if (!$multiple) {
+                $criteria->{$pkField} = $pk;
+            } else {
+                $criteria->{$pkField}('in', $pk);
+            }
+        } elseif (is_array($pkField)) {
+            if (!$multiple) {
+                for ($i=0; $i<count($pkField); $i++) {
+                    $criteria->{$pkField[$i]} = $pk[$i];
+                }
+            } else {
+                throw new EMongoException(
+                    Yii::t(
+                        'yii', 'Cannot create PK criteria for multiple composite '
+                        . 'key\'s (not implemented yet)'
+                    )
+                );
+            }
+        }
+
+        return $criteria;
+    }
 
     /**
      * This method does the actual convertion to an array.

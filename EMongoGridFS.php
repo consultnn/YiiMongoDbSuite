@@ -187,7 +187,7 @@ abstract class EMongoGridFS extends EMongoDocument
         if ($result !== false) {
             if ($profile) {
                 $criteria = new EMongoCriteria(
-                    array('conditions' => $this->getPrimaryKey())
+                    array('conditions' => array('_id' => $this->_id))
                 );
                 $profile = EMongoCriteria::findToString(
                     $criteria, false, $this->getCollectionName()
