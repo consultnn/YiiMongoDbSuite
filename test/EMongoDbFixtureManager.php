@@ -234,48 +234,52 @@ class EMongoDbFixtureManager extends CApplicationComponent
 				$this->truncateCollection($collection->getName());
 	}
 
-	/**
-	 * Loads the specified fixtures.
-	 * For each fixture, the corresponding collection will be reset first by calling
-	 * {@link resetCollection} and then be populated with the fixture data.
-	 * The loaded fixture data may be later retrieved using {@link getRows}
-	 * and {@link getRecord}.
-	 * Note, if a collection does not have fixture data, {@link resetCollection} will still
-	 * be called to reset the table.
-	 * @param array $fixtures fixtures to be loaded. The array keys are fixture names,
-	 * and the array values are either EMongoDocument class names or collection names.
-	 * If collection names, they must begin with a colon character (e.g. 'Post'
-	 * means an EMongoDocument class, while ':Post' means a collection name).
-	 */
-	public function load($fixtures)
-	{
-		$this->_rows=array();
-		$this->_records=array();
-		foreach($fixtures as $fixtureName=>$collectionName)
-		{
-			if($collectionName[0]===':')
-			{
-				$collectionName=substr($collectionName,1);
-				unset($modelClass);
-			}
-			else
-			{
-				$modelClass=Yii::import($collectionName,true);
-				$collectionName=EMongoDocument::model($modelClass)->getCollectionName();
-			}
-			$this->resetCollection($collectionName);
-			$rows=$this->loadFixture($collectionName);
-			if(is_array($rows) && is_string($fixtureName))
-			{
-				$this->_rows[$fixtureName]=$rows;
-				if(isset($modelClass))
-				{
-					foreach(array_keys($rows) as $alias)
-						$this->_records[$fixtureName][$alias]=$modelClass;
-				}
-			}
-		}
-	}
+    /**
+     * Loads the specified fixtures.
+     * For each fixture, the corresponding collection will be reset first by calling
+     * {@link resetCollection} and then be populated with the fixture data.
+     * The loaded fixture data may be later retrieved using {@link getRows}
+     * and {@link getRecord}.
+     * Note, if a collection does not have fixture data, {@link resetCollection}
+     * will still be called to reset the table. Also note that indexes will be
+     * forcibly ensured if defined in the model.
+     *
+     * @param array $fixtures Fixtures to be loaded. The array keys are fixture
+     *                        names, and the array values are either EMongoDocument
+     *                        class names or collection names. If collection names,
+     *                        they must begin with a colon character (e.g. 'Post'
+     *                        means an EMongoDocument class, while ':Post' means a
+     *                        collection name).
+     */
+    public function load($fixtures)
+    {
+        $this->_rows = array();
+        $this->_records = array();
+        foreach ($fixtures as $fixtureName => $collectionName) {
+            if (':' === $collectionName[0]) {
+                $collectionName = substr($collectionName, 1);
+                unset($modelClass);
+            } else {
+                $modelClass = Yii::import($collectionName, true);
+                $model = EMongoDocument::model($modelClass);
+                // Ensure model indexes are enforced regardless of default flag
+                // as may be required for some operations (e.g. full text search)
+                $model->setEnsureIndexes(true);
+                $model->init();
+                $collectionName = $model->getCollectionName();
+            }
+            $this->resetCollection($collectionName);
+            $rows = $this->loadFixture($collectionName);
+            if (is_array($rows) && is_string($fixtureName)) {
+                $this->_rows[$fixtureName] = $rows;
+                if (isset($modelClass)) {
+                    foreach (array_keys($rows) as $alias) {
+                        $this->_records[$fixtureName][$alias] = $modelClass;
+                    }
+                }
+            }
+        }
+    }
 
     /**
      * Returns the fixture data documents.
