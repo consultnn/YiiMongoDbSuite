@@ -2,7 +2,7 @@
 /**
  * EMongoDocument.php
  *
- * PHP version 5.2+
+ * PHP version 5.3+
  * Mongo version 1.0.5+
  *
  * @author		Dariusz Górecki <darek.krk@gmail.com>
@@ -1781,35 +1781,33 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         return new EMongoDocumentDataProvider($this);
     }
 
-	/**
-	 * Returns the static model of the specified EMongoDocument class.
-	 * The model returned is a static instance of the EMongoDocument class.
-	 * It is provided for invoking class-level methods (something similar to static class methods.)
-	 *
-	 * EVERY derived EMongoDocument class must override this method as follows,
-	 * <pre>
-	 * public static function model($className=__CLASS__)
-	 * {
-	 *     return parent::model($className);
-	 * }
-	 * </pre>
-	 *
-	 * @param string $className EMongoDocument class name.
-	 * @return EMongoDocument EMongoDocument model instance.
-	 * @since v1.0
-	 */
-	public static function model($className=__CLASS__)
-	{
-		if(isset(self::$_models[$className]))
-			return self::$_models[$className];
-		else
-		{
-			$model=self::$_models[$className]=new $className(null);
-			$model->attachBehaviors($model->behaviors());
-			return $model;
-		}
-	}
+    /**
+     * Returns the static model of the specified EMongoDocument class.
+     * The model returned is a static instance of the EMongoDocument class.
+     * It is provided for invoking class-level methods (something similar to static
+     * class methods.)
+     *
+     * @param string $className EMongoDocument class name. If not provided, defaults
+     *                          late-static binding so that the method does not have
+     *                          to be overriden by child clases.
+     *
+     * @return EMongoDocument EMongoDocument model instance.
+     * @since v1.0
+     */
+    public static function model($className = null)
+    {
+        if (null === $className) {
+            $className = get_called_class();
+        }
 
+        if (isset(self::$_models[$className])) {
+            return self::$_models[$className];
+        } else {
+            $model = self::$_models[$className] = new $className(null);
+            $model->attachBehaviors($model->behaviors());
+            return $model;
+        }
+    }
 
     /**
      * @since v1.2.2
