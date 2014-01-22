@@ -1,101 +1,376 @@
 <?php
 
+/**
+ * @author Ianaré Sévi (merge into EMongoDB)
+ * @author aoyagikouhei (original author)
+ * @license New BSD license
+ * @version 1.3
+ * @category ext
+ * @package ext.YiiMongoDbSuite
+ */
+
+/**
+ * EMongoHttpSession
+ *
+ * Example, in config/main.php:
+ *     'session' => array(
+ *         'class' => 'ext.EMongoDbHttpSession',
+ *         'collectionName' => 'yiisession',
+ *         'idColumn' => 'id',
+ *         'dataColumn' => 'data',
+ *         'expireColumn' => 'expire',
+ *     ),
+ *
+ * Options:
+ * connectionID         : mongo component name          : default mongodb
+ * collectionName       : collaction name               : default yiisession
+ * idColumn             : id column name                : default id
+ * dataColumn           : data column name              : default dada
+ * expireColumn         : expire column name            : default expire
+ * fsync                : fsync flag                    : default false
+ * safe                 : safe flag                     : default false
+ * queryTimeout         : timeout miliseconds           : default null
+ *
+ */
 class EMongoHttpSession extends CHttpSession
 {
-	public $connectionID;
-	public $collectionName;
+    /**
+     * @var string Mongo DB component.
+     */
+    public $connectionID = 'mongodb';
+    /**
+     * @var string Collection name
+     */
+    public $collectionName = 'yiisession';
+    /**
+     * @var string id column name
+     */
+    public $idColumn = 'id';
+    /**
+     * @var string level data name
+     */
+    public $dataColumn = 'data';
+    /**
+     * @var string expire column name
+     */
+    public $expireColumn = 'expire';
+    /**
+     * @var boolean forces the update to be synced to disk before returning success.
+     */
+    protected $fsync = false;
+    /**
+     * @var boolean the program will wait for the database response.
+     */
+    protected $safe = false;
+    /**
+     * @var integer if "safe" is set, this sets how long (in milliseconds) for the client to wait for a database response.
+     */
+    public $updateTimeout = null;
+    /**
+     * @var array insert options
+     */
+    private $_options;
+    /**
+     * @var MongoCollection mongo Db collection
+     */
+    private $_collection;
 
+    /**
+     * Returns current MongoCollection object.
+     * @return MongoCollection
+     */
+    protected function setCollection($collectionName)
+    {
+        if (!isset($this->_collection)) {
+            $db = Yii::app()->getComponent($this->connectionID);
+            if (!($db instanceof EMongoDB)) {
+                throw new EMongoException(
+                    'EMongoHttpSession.connectionID is invalid'
+                );
+            }
 
-	private $_db;
-	private $_collection;
+            $this->_collection = $db->getDbInstance()->selectCollection(
+                $collectionName
+            );
+        }
+        return $this->_collection;
+    }
 
-	public function getUseCustomStorage()
-	{
-		return true;
-	}
+    /**
+     * Initializes the route.
+     * This method is invoked after the route is created by the route manager.
+     */
+    public function init()
+    {
+        $this->setCollection($this->collectionName);
+        $this->_options = array(
+            'fsync' => $this->fsync,
+            'safe'  => $this->safe
+        );
+        if (null !== $this->updateTimeout) {
+            $this->_options['timeout'] = $this->updateTimeout;
+        }
+        parent::init();
+    }
 
-	public function getDbConnection()
-	{
-		if($this->_db !== null)
-			return $this->_db;
-		else if(($id = $this->connectionID) !== null)
-		{
-			if(($this->_db = Yii::app()->getComponent($id)) instanceof EMongoDB)
-				return $this->_db;
-			else
-				throw new EMongoException('EMongoHttpSession.connectionID is invalid');
-		}
-		else
-		{
-			if(($this->_db = Yii::app()->getComponent('mongodb')) instanceof EMongoDB)
-				return $this->_db;
-			else
-				throw new EMongoException('EMongoHttpSession.connectionID is invalid');
-		}
-	}
+    protected function getData($id)
+    {
+        try {
+            $data = $this->_collection->findOne(
+                array($this->idColumn => $id), array($this->dataColumn => true)
+            );
+        } catch (MongoException $e) {
+            // Try again if switching master or timeout
+            Yii::log(
+                'Failed attempting to retrieve session data; trying again.'
+                . PHP_EOL . 'Error: ' . $ex->getMessage(),
+                CLogger::LEVEL_WARNING
+            );
 
-	public function openSession()
-	{
-		$db = $this->getDbConnection();
-		$db->connect();
+            $data = $this->_collection->findOne(
+                array($this->idColumn => $id), array($this->dataColumn => true)
+            );
+        }
 
-		$this->_collection = $db->getDbInstance()->{$this->collectionName};
+        return $data;
+    }
 
-		return true;
-	}
+    protected function getExipireTime()
+    {
+        return time() + $this->getTimeout();
+    }
 
-	public function destroySession($id)
-	{
-		$this->_collection->remove(array('_id'=>$id));
-		return true;
-	}
+    /**
+     * Returns a value indicating whether to use custom session storage.
+     * This method overrides the parent implementation and always returns true.
+     * @return boolean whether to use custom storage.
+     */
+    public function getUseCustomStorage()
+    {
+        return true;
+    }
 
-	public function gcSession($maxLifetime)
-	{
-		$db = $this->getDbConnection();
-		$db->connect();
+    /**
+     * Session open handler.
+     * Do not call this method directly.
+     *
+     * @param string $savePath session save path
+     * @param string $sessionName session name
+     *
+     * @return boolean whether session is opened successfully
+     */
+    public function openSession($savePath, $sessionName)
+    {
+        $this->gcSession(0);
+    }
 
-		$db->getDbInstance()->{$this->collectionName}->remove(array(
-			'expire'=>array('$lt'=>time())
-		));
-		return true;
-	}
+    /**
+     * Session read handler.
+     * Do not call this method directly.
+     *
+     * @param string $id session ID
+     *
+     * @return string the session data
+     */
+    public function readSession($id)
+    {
+        $row = $this->getData($id);
+        return is_null($row) ? '' : $row[$this->dataColumn];
+    }
 
-	public function readSession($id)
-	{
-		$doc = $this->_collection->findOne(array(
-			'_id'=>$id,
-			'expire'=>array('$gt'=>time())
-		));
+    /**
+     * Session write handler.
+     * Do not call this method directly.
+     *
+     * @param string $id   session ID
+     * @param string $data session data
+     *
+     * @return boolean whether session write is successful
+     */
+    public function writeSession($id, $data)
+    {
+        $options = $this->_options;
+        $options['upsert'] = true;
+        $data = array(
+            $this->dataColumn   => $data,
+            $this->expireColumn => $this->getExipireTime(),
+            $this->idColumn     => $id
+        );
+        try {
+            $result = $this->_collection->update(
+                array($this->idColumn => $id), $data, $options
+            );
+        } catch (MongoException $ex) {
+            // Try again if switching master or timeout
+            Yii::log(
+                'Failed attempting to write session; trying again.'
+                . PHP_EOL . 'Error: ' . $ex->getMessage(),
+                CLogger::LEVEL_WARNING
+            );
 
-		return $doc !== null ? $doc['data'] : '';
-	}
+            $result = $this->_collection->update(
+                array($this->idColumn => $id), $data, $options
+            );
+        }
 
-	public function writeSession($id, $data)
-	{
-		// exception must be caught in session write handler
-		// http://us.php.net/manual/en/function.session-set-save-handler.php
-		try
-		{
-			$expire = time() + $this->getTimeout();
+        return $result;
+    }
 
-			if($this->_collection===null)
-			{
-				$db = $this->getDbConnection();
-				$db->connect();
-				$this->_collection = $db->getDbInstance()->{$this->collectionName};
-			}
+    /**
+     * Session destroy handler.
+     * Do not call this method directly.
+     * @param string $id session ID
+     * @return boolean whether session is destroyed successfully
+     */
+    public function destroySession($id)
+    {
+        try {
+            $result = $this->_collection->remove(
+                array($this->idColumn => $id), $this->_options
+            );
+        } catch (MongoException $ex) {
+            // Try again if switching master or timeout
+            Yii::log(
+                'Failed attempting to destroy session; trying again.'
+                . PHP_EOL . 'Error: ' . $ex->getMessage(),
+                CLogger::LEVEL_WARNING
+            );
 
-			$this->_collection->save(array(
-				'_id'=>$id,
-				'expire'=>$expire,
-				'data'=>$data,
-			));
-		}
-		catch(Exception $e)
-		{
-			return false;
-		}
-		return true;
-	}
+            $result = $this->_collection->remove(
+                array($this->idColumn => $id), $this->_options
+            );
+        }
+
+        return $result;
+    }
+
+    /**
+     * Session GC (garbage collection) handler.
+     * Do not call this method directly.
+     *
+     * @param integer $maxLifetime the number of seconds after which data will be seen as 'garbage' and cleaned up.
+     * @return boolean whether session is GCed successfully
+     */
+    public function gcSession($maxLifetime)
+    {
+        try {
+            $result = $this->_collection->remove(
+                array($this->expireColumn => array('$lt' => time())),
+                $this->_options
+            );
+        } catch (MongoException $ex) {
+            // Try again if switching master or timeout
+            Yii::log(
+                'Failed attempting to gc session; trying again.'
+                . PHP_EOL . 'Error: ' . $ex->getMessage(),
+                CLogger::LEVEL_WARNING
+            );
+
+            $result = $this->_collection->remove(
+                array($this->expireColumn => array('$lt' => time())),
+                $this->_options
+            );
+        }
+
+        return $result;
+    }
+
+    /**
+     * Updates the current session id with a newly generated one.
+     * Please refer to {@link http://php.net/session_regenerate_id} for more details.
+     *
+     * @param boolean $deleteOldSession Whether to delete the old associated session
+     *                                  file or not.
+     */
+    public function regenerateID($deleteOldSession = false)
+    {
+        $oldId = session_id();
+        parent::regenerateID(false);
+        $newId = session_id();
+        $row = $this->getData($oldId);
+        if (is_null($row)) {
+            try {
+                $this->_collection->insert(
+                    array(
+                        $this->idColumn     => $newId,
+                        $this->expireColumn => $this->getExipireTime(),
+                    ),
+                    $this->_options
+                );
+
+            } catch (MongoException $e) {
+                // Try again if switching master or timeout
+                Yii::log(
+                    'Failed attempting to persist session; trying again.' . PHP_EOL
+                    . 'Error: ' . $e->getMessage(),
+                    CLogger::LEVEL_WARNING
+                );
+
+                $this->_collection->insert(
+                    array(
+                        $this->idColumn     => $newId,
+                        $this->expireColumn => $this->getExipireTime(),
+                    ),
+                    $this->_options
+                );
+            }
+        } elseif ($deleteOldSession && '_id' !== $this->idColumn) {
+            try {
+                $this->_collection->update(
+                    array($this->idColumn => $oldId),
+                    array($this->idColumn => $newId),
+                    $this->_options
+                );
+            } catch (MongoException $e) {
+                // Try again if switching master or timeout
+                Yii::log(
+                    'Failed attempting to update session; trying again.' . PHP_EOL
+                    . 'Error: ' . $e->getMessage(),
+                    CLogger::LEVEL_WARNING
+                );
+
+                $this->_collection->update(
+                    array($this->idColumn => $oldId),
+                    array($this->idColumn => $newId),
+                    $this->_options
+                );
+            }
+        } else {
+            unset($row['_id']); // unset before in case idColumn is _id
+            $row[$this->idColumn] = $newId;
+            try {
+                $this->_collection->insert($row, $this->_options);
+            } catch (MongoException $e) {
+                // Try again if switching master or timeout
+                Yii::log(
+                    'Failed attempting to persist session; trying again.' . PHP_EOL
+                    . 'Error: ' . $e->getMessage(),
+                    CLogger::LEVEL_WARNING
+                );
+                $this->_collection->insert($row, $this->_options);
+            }
+        }
+    }
+
+    /**
+     * Set the file-sync mode flag for insert/update
+     *
+     * @param boolean $fsync Whether fsync should be set
+     */
+    public function setFsync($fsync)
+    {
+        $this->fsync = (bool) $fsync;
+        $this->_options['fsync'] = (bool) $fsync;
+    }
+
+    /**
+     * Set the safe mode flag for insert/update
+     *
+     * @param boolean $safe Whether safe mode should be set
+     */
+    public function setSafe($safe)
+    {
+        $this->safe = (bool) $safe;
+        $this->_options['safe'] = (bool) $safe;
+    }
 }
