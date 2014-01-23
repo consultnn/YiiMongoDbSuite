@@ -23,7 +23,8 @@ class EMongoUniqueValidator extends CValidator
 
     /**
      * Additional query criteria to use for uniqueness check.
-     * If value is an array, it will be passed to the EMongoCriteria as 'condiditons'
+     * If value is an array, it will be passed to the EMongoCriteria constructor as
+     * 'conditions' parameter.
      * @var array|EMongoCriteria
      * @see EMongoCritiera::__construct()
      */
@@ -68,8 +69,8 @@ class EMongoUniqueValidator extends CValidator
             );
         }
         $criteria->addCond($attribute, '==', $value);
-        foreach ($this->additionalAttributes as $attribute) {
-            $criteria->addCond($attribute, '==', $object->$attribute);
+        foreach ($this->additionalAttributes as $additional) {
+            $criteria->addCond($additional, '==', $object->$additional);
         }
         $count = $object->model()->count($criteria);
 
