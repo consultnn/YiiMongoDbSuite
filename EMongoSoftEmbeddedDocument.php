@@ -57,28 +57,41 @@ abstract class EMongoSoftEmbeddedDocument extends EMongoEmbeddedDocument
     }
 
     /**
-     * Adds soft attributes support to magic __isset method
+     * Adds soft attributes support to magic __isset method.
+     * Checks to see if a soft attribute is defined for the given name and whether
+     * it has a value of null. If the attribute is not a soft attribute, then this
+     * call falls back to parent logic.
+     *
+     * @param string $name Attribute name to check if it is set
+     *
      * @see EMongoEmbeddedDocument::__isset()
+     * @return boolean if attribute is defined and not null
      * @since v1.4.0
      */
     public function __isset($name)
     {
         if (array_key_exists($name, $this->softAttributes)) {
-            return true;
+            return null !== $this->softAttributes[$name];
         } else {
             return parent::__isset($name);
         }
     }
 
     /**
-     * Adds soft attributes support to magic __unset method
+     * Adds soft attributes support to magic __unset method.
+     * If the attribute is a defined soft attribute, then the soft attribute value
+     * is set to null. If the attribute is not a soft attribute, then this call
+     * falls back to parent logic.
+     *
+     * @param string $name Attribute name to unset
+     *
      * @see CComponent::__unset()
      * @since v1.4.0
      */
     public function __unset($name)
     {
         if (array_key_exists($name, $this->softAttributes)) {
-            unset($this->softAttributes[$name]);
+            $this->softAttributes[$name] = null;
         } else {
             parent::__unset($name);
         }
