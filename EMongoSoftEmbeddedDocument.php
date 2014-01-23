@@ -120,7 +120,22 @@ abstract class EMongoSoftEmbeddedDocument extends EMongoEmbeddedDocument
      */
     protected function _toArray()
     {
-        $arr = parent::_toArray();
+        $arr = array();
+        $embeddedDocs = $this->embeddedDocuments();
+        // Iterate over parent list of attribute names to exclude soft attributes
+        foreach (parent::attributeNames() as $name) {
+            if (isset($embeddedDocs[$name])) {
+                // Only populate embedded document if not null
+                if (null !== $this->_embedded->itemAt($name)) {
+                    $arr[$name] = $this->_embedded[$name]->toArray();
+                }
+                // Note: unlike EMongoEmbeddedDocument, we do not set attribute to
+                // null if the embedded document is null
+            } else {
+                $arr[$name] = $this->{$name};
+            }
+        }
+
         foreach ($this->softAttributes as $key => $value) {
             if (null !== $value) {
                 $arr[$key] = $value;
