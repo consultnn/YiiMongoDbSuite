@@ -7,7 +7,7 @@ Requirements:
 
 ## Added features:
 - Replica set support (both connecting and exception handling)
-- Updated driver support (geospatial queries, read-preferences, write concerns, full text indexes, etc.)
+- Updated driver support (geospatial queries, read-preferences, write concerns, background indexes, etc.)
 - Query profiling
 - Reduced boilerplate necessary for individual classes
 - Bug fixes
@@ -17,6 +17,7 @@ Requirements:
 - EmbeddedMongoDocument::toArray() will no longer populate an embedded document unless it has already been loaded (thus stored as null when persisted)
 - EmbeddedMongoDocument::validate() calls validate on embedded documents (may cause parent document to fail save())
 - EMongoDocument::$ensureIndexes defaults to false, but may be changed using new getter/setter methods
+- EMongoDocument::ensureIndexes() defaults to ensuring indexes as a background process on the server
 
 The following was the README as provided by the forked project:
 

@@ -467,20 +467,33 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         }
     }
 
-	/**
-	 * This function may return array of indexes for this collection
-	 * array sytntax is:
-	 * return array(
-	 * 	'index_name'=>array('key'=>array('fieldName1'=>EMongoCriteria::SORT_ASC, 'fieldName2'=>EMongoCriteria::SORT_DESC),
-	 * 	'index2_name'=>array('key'=>array('fieldName3'=>EMongoCriteria::SORT_ASC, 'unique'=>true),
-	 * );
-	 * @return array list of indexes for this collection
-	 * @since v1.1
-	 */
-	public function indexes()
-	{
-		return array();
-	}
+    /**
+     * This function may return array of indexes for this collection
+     * Note, that unless otherwise specified, the index parameter 'background' will
+     * be set to true.
+     *
+     * @example return array(
+     *     'index_name' => array(
+     *         'key' => array(
+     *             'fieldName1' => EMongoCriteria::SORT_ASC,
+     *             'fieldName2' => EMongoCriteria::SORT_DESC,
+     *         ),
+     *         'sparse' => true,
+     *     ),
+     *     'index2_name' => array(
+     *         'key'    => array('fieldName3' => EMongoCriteria::SORT_ASC),
+     *         'unique' => true,
+     *     ),
+     * );
+     *
+     * @link http://php.net/manual/en/mongocollection.ensureindex.php
+     * @return array list of indexes for this collection
+     * @since v1.1
+     */
+    public function indexes()
+    {
+        return array();
+    }
 
     /**
      * @since v1.1
@@ -490,8 +503,9 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         $indexNames = array_keys(self::$_indexes[$this->getCollectionName()]);
         foreach ($this->indexes() as $name => $index) {
             if (!in_array($name, $indexNames)) {
-                $indexParams = $index;
-                $indexParams['name'] = $name;
+                $indexParams = array_merge(
+                    array('background' => true, 'name' => $name), $index
+                );
                 unset($indexParams['key']);
 
                 $profile = $this->getEnableProfiler();
