@@ -593,11 +593,11 @@ class EMongoCriteria extends CComponent
         } else {
             $query = 'db.';
         }
-        $query .= $operator . '(';
+        $query .= $command . '(';
 
         $count = func_num_args();
         if ($count > 2) {
-            for ($i = 3; $i < $count; $i++) {
+            for ($i = 2; $i < $count; $i++) {
                 $query .= ', ' . self::queryValueToString(func_get_arg($i));
             }
         }
