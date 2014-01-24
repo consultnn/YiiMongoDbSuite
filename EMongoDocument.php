@@ -55,12 +55,20 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      */
     protected $enableProfiler = false;
 
-	/**
-	 * EMongoDB component static instance
-	 * @var EMongoDB $_emongoDb;
-	 * @since v1.0
-	 */
-	protected static $_emongoDb;
+    /**
+     * Yii application component used to retrieve/identify the EMongoDB instance to
+     * use for this model.
+     * @see setMongoDbComponent()
+     * @var string
+     */
+    protected $mongoComponentId = 'mongodb';
+
+    /**
+     * EMongoDB component static instances
+     * @var EMongoDB[] $_emongoDb
+     * @since v1.0
+     */
+    protected static $_emongoDb;
 
 	/**
 	 * MongoDB special field, every document has to have this
@@ -138,30 +146,46 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 		}
 	}
 
-	/**
-	 * Get EMongoDB component instance
-	 * By default it is mongodb application component
-	 *
-	 * @return EMongoDB
-	 * @since v1.0
-	 */
-	public function getMongoDBComponent()
-	{
-		if(self::$_emongoDb===null)
-			self::$_emongoDb = Yii::app()->getComponent('mongodb');
+    /**
+     * Get EMongoDB component instance
+     * By default it is mongodb application component
+     *
+     * @return EMongoDB
+     * @since v1.0
+     */
+    public function getMongoDBComponent()
+    {
+        if (null === self::$_emongoDb[$this->mongoComponentId]) {
+            self::$_emongoDb[$this->mongoComponentId]
+                = Yii::app()->getComponent($this->mongoComponentId);
+        }
 
-		return self::$_emongoDb;
-	}
+        return self::$_emongoDb[$this->mongoComponentId];
+    }
 
-	/**
-	 * Set EMongoDB component instance
-	 * @param EMongoDB $component
-	 * @since v1.0
-	 */
-	public function setMongoDBComponent(EMongoDB $component)
-	{
-		self::$_emongoDb = $component;
-	}
+    /**
+     * Set EMongoDB component instance to use.
+     * To support multiple Mongo instances, the componentId is used to distinguish
+     * between multiple instances. If the component ID parameter is not specified,
+     * this will use the existing componentID (defaults to 'mongodb'). If a
+     * componentId is specified, then the local component ID will also be set to the
+     * provided value.
+     *
+     * @param EMongoDB $component   EMongoDB instance for this model to use
+     * @param string   $componentId Yii application component ID for this instance
+     *
+     * @since v1.0
+     */
+    public function setMongoDBComponent(EMongoDB $component, $componentId = null)
+    {
+        if (! $componentId) {
+            $componentId = $this->mongoComponentId;
+        } else {
+            $this->mongoComponentId = $componentId;
+        }
+
+        self::$_emongoDb[$componentId] = $component;
+    }
 
 	/**
 	 * Get raw MongoDB instance
