@@ -598,7 +598,10 @@ class EMongoCriteria extends CComponent
         $count = func_num_args();
         if ($count > 2) {
             for ($i = 2; $i < $count; $i++) {
-                $query .= ', ' . self::queryValueToString(func_get_arg($i));
+                if (2 !== $i) {
+                    $query .= ', ';
+                }
+                $query .= self::queryValueToString(func_get_arg($i));
             }
         }
         $query .= ')';
