@@ -544,6 +544,7 @@ class EMongoCriteria extends CComponent
      * @param string         $collection Collection operation is performed on
      *
      * @return string The generated MongoDb query string
+     * @since v1.4.0
      */
     public static function findToString(EMongoCriteria $criteria, $multiple = true,
         $collection = null
@@ -585,6 +586,7 @@ class EMongoCriteria extends CComponent
      * @param mixed   $params,... Additional parameters passed to command
      *
      * @return string The generated MongoDb query string
+     * @since v1.4.0
      */
     public static function commandToString($command, $collection = null)
     {
@@ -615,6 +617,7 @@ class EMongoCriteria extends CComponent
      * @param mixed $value Value to be converted to a string
      *
      * @return string Query portion as a string
+     * @since v1.4.0
      */
     public static function queryValueToString($value)
     {
@@ -656,6 +659,7 @@ class EMongoCriteria extends CComponent
 
     /**
      * @return string Query as a string
+     * @since v1.4.0
      */
     public function __toString()
     {

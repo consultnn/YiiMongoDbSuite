@@ -381,6 +381,7 @@ abstract class EMongoEmbeddedDocument extends CModel
      *                                before performing validation.
      *
      * @return boolean Whether the model is considered valid for the given parameters
+     * @since v1.4.0
      */
     public function validate($attributes = null, $clearErrors = true)
     {
@@ -443,6 +444,8 @@ abstract class EMongoEmbeddedDocument extends CModel
     /**
      * When de-serializing the document, ensure static variables are setup (embedded
      * documents) and the model is initialized.
+     *
+     * @since v1.4.0
      */
     public function __wakeup()
     {

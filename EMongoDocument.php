@@ -52,6 +52,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
     /**
      * Whether to generate profiler log messages
      * @var boolean
+     * @since v1.4.0
      */
     protected $enableProfiler = false;
 
@@ -60,6 +61,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      * use for this model.
      * @see setMongoDbComponent()
      * @var string
+     * @since v1.4.0
      */
     protected $mongoComponentId = 'mongodb';
 
@@ -1883,6 +1885,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      *
      * @see EMongoEmbeddedDocument::_toArray()
      * @return array an associative array of the contents of this object
+     * @since v1.4.0
      */
     protected function _toArray()
     {
@@ -1911,6 +1914,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      * @param array  $params    Parameters passed to EMongoUniqueValidator
      *
      * @see EMongoUniqueValidator
+     * @since v1.4.0
      */
     public function uniqueValidator($attribute, $params)
     {

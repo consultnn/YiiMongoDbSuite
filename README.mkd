@@ -11,6 +11,7 @@ Requirements:
 - Query profiling
 - Reduced boilerplate necessary for individual classes
 - Bug fixes
+- Multiple DB support
 
 ## Backwards compatibilty breaks with the parent:
 - EMongoDB::$persistentConnection attribute removed (deprecated in PHP Mongo driver 1.3.0+)

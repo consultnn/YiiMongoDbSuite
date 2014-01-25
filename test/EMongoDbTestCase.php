@@ -17,7 +17,7 @@ Yii::import('system.test.CDbTestCase');
 /**
  * EMongoDbTestCase extends base CDbTestCase.
  *
- * Right now, EMongDbTestCase is identical to CDbTestCase.
+ * Simplifies specifying the component id of the DB fixture manager
  *
  * @author		Philippe Gaultier <pgaultier@ibitux.com>
  * @copyright	2010-2011 Ibitux
@@ -28,5 +28,20 @@ Yii::import('system.test.CDbTestCase');
  */
 abstract class EMongoDbTestCase extends CDbTestCase
 {
+    /**
+     * Yii application component ID for the EMongoDbFixtureManager
+     * @var string
+     * @since v1.4.0
+     */
+    protected $fixtureComponentId = 'fixture';
+
+    /**
+     * @return EMongoDbFixtureManager the database fixture manager
+     * @since v1.4.0
+     */
+    public function getFixtureManager()
+    {
+        return Yii::app()->getComponent($this->fixtureComponentId);
+    }
 
 }

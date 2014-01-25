@@ -40,12 +40,6 @@ That's all you can start using the fixture manager right now.
       public $name;
       public $pass;
 
-      // This has to be defined in every model, this is same as with standard Yii ActiveRecord
-      public static function model($className=__CLASS__)
-      {
-        return parent::model($className);
-      }
-
       // This method is required!
       public function getCollectionName()
       {
@@ -121,3 +115,79 @@ class UserTest extends EMongoDbTestCase {
 Embedded document can be defined in fixtures as array as all the 
 difficult work to map embedded documents is done in the EMongoDocument class. 
 
+
+
+## Multiple database support
+
+Multiple Mongo database support was added in v 1.4.0, but requires slight modification from the instructions above.
+
+### Setup
+
+To support multiple databases, you'll need a component for each instance in your config file:
+
+~~~
+[php]
+
+
+    'import' => array(
+      // ...
+      'ext.YiiMongoDbSuite.*',
+      'ext.YiiMongoDbSuite.test.*',
+    ),
+
+    'components' => array(
+      'mongodb1' => array(
+        'class'  => 'EMongoDB',
+        'dbName' => 'db1',
+        // ...
+      ),
+      'mongodb2' => array(
+        'class'  => 'EMongoDB',
+        'dbName' => 'db2',
+        // ...
+      ),
+      'fixture_db1' => array(
+        'class'        => 'EMongoDbFixtureManager',
+        'connectionID' => 'mongodb1',
+        // ...
+      ),
+      'fixture_db2'=>array(
+        'class'        => 'EMongoDbFixtureManager',
+        'connectionID' => 'mongodb2',
+        // ...
+      ),
+      // ...
+    ),
+
+
+~~~
+
+### Models
+
+In your models, you'll need to specify the MongoDb connection ID that it belongs to:
+
+~~~
+[php]
+
+    class User extends EMongoDocument
+    {
+      protected $mongoComponentId = 'mongodb1';
+      // ...
+    }
+
+~~~
+
+### Unit tests
+
+In your unit tests, you'll need to specify the MongoDb fixture manager that it belongs to:
+
+~~~
+[php]
+
+    class UserTest extends EMongoDbTestCase
+    {
+      protected $fixtureComponentId = 'fixture_db1';
+      // ...
+    }
+
+~~~

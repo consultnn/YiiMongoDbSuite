@@ -14,7 +14,7 @@
  * @copyright   2014 Business.com Media Inc
  * @license     http://www.yiiframework.com/license/ BSD license
  * @package     ext.YiiMongoDbSuite.extra
- * @since       v1.3.7
+ * @since       v1.4.0
  */
 class EMongoValidator extends CValidator
 {
@@ -117,6 +117,7 @@ class EMongoValidator extends CValidator
      *
      * @return boolean true if is an instance of a MongoId or could be the string
      *                      equivalent
+     * @since v1.4.0
      */
     public static function isMongoId($id, $instance = true)
     {
