@@ -1918,9 +1918,13 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      */
     public function uniqueValidator($attribute, $params)
     {
+        // Ensure reference can be resolved
+        if (! Yii::getPathOfAlias('MongoDb')) {
+            Yii::setPathOfAlias('MongoDb', __DIR__);
+        }
         // Proxy to EMongoUniqueValidator
         $validator = CValidator::createValidator(
-            'MongoDB.extra.MongoUniqueValidator', $this, $attribute, $params
+            'MongoDb.extra.MongoUniqueValidator', $this, $attribute, $params
         );
         $validator->validate($this, array($attribute));
     }
