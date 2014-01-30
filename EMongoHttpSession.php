@@ -216,7 +216,7 @@ class EMongoHttpSession extends CHttpSession
             $this->expireColumn => $this->getExipireTime(),
             $this->idColumn     => $id
         );
-        if ($this->profile) {
+        if ($this->profiler) {
             $profile = EMongoCriteria::commandToString(
                 'update', $this->collectionName, $data, array('upsert' => true)
             );
@@ -255,7 +255,7 @@ class EMongoHttpSession extends CHttpSession
      */
     public function destroySession($id)
     {
-        if ($this->profile) {
+        if ($this->profiler) {
             $profile = EMongoCriteria::commandToString(
                 'remove', $this->collectionName, array($this->idColumn => $id)
             );
@@ -296,7 +296,7 @@ class EMongoHttpSession extends CHttpSession
     public function gcSession($maxLifetime)
     {
         $query = array($this->expireColumn => array('$lt' => time()));
-        if ($this->profile) {
+        if ($this->profiler) {
             $profile = EMongoCriteria::commandToString(
                 'remove', $this->collectionName, $query
             );
@@ -339,7 +339,7 @@ class EMongoHttpSession extends CHttpSession
                 $this->idColumn     => $newId,
                 $this->expireColumn => $this->getExipireTime(),
             );
-            if ($this->profile) {
+            if ($this->profiler) {
                 $profile = EMongoCriteria::commandToString(
                     'insert', $this->collectionName, $data
                 );
@@ -358,7 +358,7 @@ class EMongoHttpSession extends CHttpSession
                 $this->_collection->insert($data, $this->_options);
             }
         } elseif ($deleteOldSession && '_id' !== $this->idColumn) {
-            if ($this->profile) {
+            if ($this->profiler) {
                 $profile = EMongoCriteria::commandToString(
                     'update', $this->collectionName,
                     array($this->idColumn => $oldId),
@@ -389,7 +389,7 @@ class EMongoHttpSession extends CHttpSession
         } else {
             unset($row['_id']); // unset before in case idColumn is _id
             $row[$this->idColumn] = $newId;
-            if ($this->profile) {
+            if ($this->profiler) {
                 $profile = EMongoCriteria::commandToString(
                     'insert', $this->collectionName, $row
                 );
