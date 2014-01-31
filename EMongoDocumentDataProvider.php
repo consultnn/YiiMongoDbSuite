@@ -146,7 +146,7 @@ class EMongoDocumentDataProvider extends CDataProvider
             $this->_criteria->setSort($sort);
         }
 
-        return $this->model->findAll($this->_criteria);
+        return $this->model->resetScope()->findAll($this->_criteria);
     }
 
 	/**
