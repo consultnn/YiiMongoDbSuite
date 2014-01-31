@@ -175,7 +175,7 @@ class EMongoDocumentDataProvider extends CDataProvider
         // count here, reset the scope to what it was originally then return the
         // count
         $criteria = clone $this->getCriteria();
-        $count = $this->model->count($this->_criteria);
+        $count = $this->model->resetScope()->count($this->_criteria);
         $this->_criteria = $criteria;
 
         return $count;
