@@ -1924,7 +1924,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         }
         // Proxy to EMongoUniqueValidator
         $validator = CValidator::createValidator(
-            'MongoDb.extra.MongoUniqueValidator', $this, $attribute, $params
+            'MongoDb.extra.EMongoUniqueValidator', $this, $attribute, $params
         );
         $validator->validate($this, array($attribute));
     }
