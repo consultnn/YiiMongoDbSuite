@@ -137,8 +137,11 @@ abstract class EMongoSoftEmbeddedDocument extends EMongoEmbeddedDocument
         }
 
         foreach ($this->softAttributes as $key => $value) {
-            if (null !== $value) {
-                $arr[$key] = $value;
+            if (null === $value) {
+                // when a softAttribute has a NULL value, it wants to be excluded
+                unset($arr[$key]);
+            } else {
+                $arr[$key]=$value;
             }
         }
 
