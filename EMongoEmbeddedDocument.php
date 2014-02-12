@@ -453,7 +453,7 @@ abstract class EMongoEmbeddedDocument extends CModel
         $this->init();
 
         // Ensure the embedded document configuration is setup for this class
-        if (! isset(self::$_embeddedConfig[get_class($this)])) {
+        if ($this->hasEmbeddedDocuments()) {
             self::$_embeddedConfig[get_class($this)] = $this->embeddedDocuments();
         }
     }
