@@ -627,6 +627,10 @@ class EMongoCriteria extends CComponent
                 $string = 'ObjectId("' . (string) $value . '")';
             } elseif ($value instanceof MongoRegex) {
                 $string = (string) $value;
+            } elseif ($value instanceof MongoDate) {
+                // Get ISO format with microseconds inserted
+                $format = 'Y-m-d\TH:i:s.' . $value->usec / 1000 . 'O';
+                $string = 'ISODate("' . date($format, $value->sec) . '")';
             } else {
                 $string = CJSON::encode($value);
             }
