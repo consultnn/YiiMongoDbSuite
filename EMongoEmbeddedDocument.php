@@ -158,61 +158,64 @@ abstract class EMongoEmbeddedDocument extends CModel
 		$this->onAfterEmbeddedDocsInit(new CModelEvent($this));
 	}
 
-	/**
-	 * @since v1.0.8
-	 */
-	public function __get($name)
-	{
-		if($this->hasEmbeddedDocuments() && isset(self::$_embeddedConfig[get_class($this)][$name])) {
-			// Late creation of embedded documents on first access
-			if (is_null($this->_embedded->itemAt($name))) {
-				$docClassName = self::$_embeddedConfig[get_class($this)][$name];
-				$doc = new $docClassName($this->getScenario());
-				$doc->setOwner($this);
-				$this->_embedded->add($name, $doc);
-			}
-			return $this->_embedded->itemAt($name);
-		}
-		else
-			return parent::__get($name);
-	}
+    /**
+     * @since v1.0.8
+     */
+    public function __get($name)
+    {
+        if ($this->hasEmbeddedDocument($name)) {
+            // Late creation of embedded documents on first access
+            if (null === $this->_embedded->itemAt($name)) {
+                $embeddedDocs = $this->embeddedDocuments();
+                $docClassName = $embeddedDocs[$name];
+                $doc = new $docClassName($this->getScenario());
+                $doc->setOwner($this);
+                $this->_embedded->add($name, $doc);
+            }
 
-	/**
-	 * @since v1.0.8
-	 */
-	public function __set($name, $value)
-	{
-		if($this->hasEmbeddedDocuments() && isset(self::$_embeddedConfig[get_class($this)][$name]))
-		{
-			if(is_array($value)) {
-				// Late creation of embedded documents on first access
-				if (is_null($this->_embedded->itemAt($name))) {
-					$docClassName = self::$_embeddedConfig[get_class($this)][$name];
-					$doc = new $docClassName($this->getScenario());
-					$doc->setOwner($this);
-					$this->_embedded->add($name, $doc);
-				}
-				return $this->_embedded->itemAt($name)->attributes=$value;
-			}
-			else if($value instanceof EMongoEmbeddedDocument)
-				return $this->_embedded->add($name, $value);
-		}
-		else
-			parent::__set($name, $value);
-	}
+            return $this->_embedded->itemAt($name);
+        } else {
+            return parent::__get($name);
+        }
+    }
 
-	/**
-	 * @since v1.3.2
-	 * @see CComponent::__isset()
-	 */
-	public function __isset($name) {
-		if($this->hasEmbeddedDocuments() && isset(self::$_embeddedConfig[get_class($this)][$name]))
-		{
-			return isset($this->_embedded[$name]);
-		}
-		else
-			return parent::__isset($name);
-	}
+    /**
+     * @since v1.0.8
+     */
+    public function __set($name, $value)
+    {
+        if ($this->hasEmbeddedDocument($name)) {
+            if (is_array($value)) {
+                // Late creation of embedded documents on first access
+                if (null === $this->_embedded->itemAt($name)) {
+                    $embeddedDocs = $this->embeddedDocuments();
+                    $docClassName = $embeddedDocs[$name];
+                    $doc = new $docClassName($this->getScenario());
+                    $doc->setOwner($this);
+                    $this->_embedded->add($name, $doc);
+                }
+
+                return $this->_embedded->itemAt($name)->attributes = $value;
+            } elseif ($value instanceof EMongoEmbeddedDocument) {
+                return $this->_embedded->add($name, $value);
+            }
+        } else {
+            parent::__set($name, $value);
+        }
+    }
+
+    /**
+     * @since v1.3.2
+     * @see CComponent::__isset()
+     */
+    public function __isset($name)
+    {
+        if ($this->hasEmbeddedDocument($name)) {
+            return isset($this->_embedded[$name]);
+        } else {
+            return parent::__isset($name);
+        }
+    }
 
 	/**
 	 * @since v1.0.8
@@ -242,7 +245,20 @@ abstract class EMongoEmbeddedDocument extends CModel
     }
 
     /**
-     * Determine if this mjodel as defined embedded documents.
+     * Check to see if this document has an embedded document with the given name
+     *
+     * @param string $name Embedded document attribute name
+     *
+     * @since v1.4.1
+     * @return boolean Whether an embedded document is defined with the given name.
+     */
+    public function hasEmbeddedDocument($name)
+    {
+        return isset(self::$_embeddedConfig[get_class($this)][$name]);
+    }
+
+    /**
+     * Determine if this model has defined embedded documents.
      *
      * @since v1.0.8
      * @see embeddedDocuments()
@@ -280,7 +296,7 @@ abstract class EMongoEmbeddedDocument extends CModel
             }
             if ($this->hasEmbeddedDocuments()) {
                 $names = array_merge(
-                    $names, array_keys(self::$_embeddedConfig[$className])
+                    $names, array_keys($this->embeddedDocuments())
                 );
             }
             self::$_attributes[$className] = $names;
@@ -319,11 +335,10 @@ abstract class EMongoEmbeddedDocument extends CModel
     protected function _toArray()
     {
         $arr = array();
-        $embeddedDocs = $this->embeddedDocuments();
         foreach ($this->attributeNames() as $name) {
-            if (isset($embeddedDocs[$name])) {
+            if ($this->hasEmbeddedDocument($name)) {
                 // Only populate embedded document if not null
-                if (null !== $this->_embedded->itemAt($name)) {
+                if ($this->_embedded && null !== $this->_embedded->itemAt($name)) {
                     $arr[$name] = $this->_embedded[$name]->toArray();
                 } else {
                     $arr[$name] = null;
@@ -386,7 +401,7 @@ abstract class EMongoEmbeddedDocument extends CModel
     public function validate($attributes = null, $clearErrors = true)
     {
         $valid = parent::validate($attributes, $clearErrors);
-        if ($this->hasEmbeddedDocuments()) {
+        if ($this->hasEmbeddedDocuments() && $this->_embedded) {
             foreach (array_keys($this->embeddedDocuments()) as $attribute) {
                 if (null !== $this->_embedded->itemAt($attribute)
                     && (null === $attributes || in_array($attribute, $attributes))
@@ -415,13 +430,11 @@ abstract class EMongoEmbeddedDocument extends CModel
     public function getAttributes($names = null)
     {
         $values = array();
-        $embeddedDocs = $this->embeddedDocuments();
         foreach ($this->attributeNames() as $name) {
             // Check if attribute is an embedded document and whether it has a value
             // or not
-            if (! array_key_exists($name, $embeddedDocs)
-                || (array_key_exists($name, $embeddedDocs)
-                && null !== $this->_embedded->itemAt($name))
+            if (! $this->hasEmbeddedDocument($name)
+                || ($this->_embedded && null !== $this->_embedded->itemAt($name))
             ) {
                 $values[$name] = $this->$name;
             } else {
