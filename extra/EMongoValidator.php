@@ -84,8 +84,11 @@ class EMongoValidator extends CValidator
                 case self::TYPE_DATE:
                     if ($this->filter && is_numeric($value)) {
                         $value = new MongoDate($value);
-                    } elseif ($value instanceof DateTime) {
+                    } elseif ($this->filter && $value instanceof DateTime) {
                         $value = new MongoDate($value->getTimestamp());
+                    } elseif ($this->filter && false !== strtotime($value)) {
+                        // If able to parse date, use as a last result
+                        $value = new MongoDate(strtotime($value));
                     }
 
                     if (!$value instanceof MongoDate) {
