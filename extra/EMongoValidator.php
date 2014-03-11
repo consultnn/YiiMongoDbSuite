@@ -39,6 +39,8 @@ class EMongoValidator extends CValidator
 
     /**
      * Whether the attribute value can be null or empty. Defaults to true.
+     * If filter and allowEmpty are true and a value is empty, the attribute will be
+     * set to null.
      * @var boolean
      */
     public $allowEmpty = true;
@@ -67,6 +69,8 @@ class EMongoValidator extends CValidator
         if (empty($value)) {
             if (!$this->allowEmpty) {
                 $msg = '{attribute} may not be empty.';
+            } else {
+                $value = null;
             }
         } else {
             switch ($this->type) {
