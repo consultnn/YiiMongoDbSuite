@@ -214,21 +214,6 @@ abstract class EMongoEmbeddedDocument extends CModel
 			return parent::__isset($name);
 	}
 
-	/**
-	 * @since v1.0.8
-	 */
-	public function afterValidate()
-	{
-		if($this->hasEmbeddedDocuments())
-			foreach($this->_embedded as $doc)
-			{
-				if(!$doc->validate())
-				{
-					$this->addErrors($doc->getErrors());
-				}
-			}
-	}
-
     /**
      * Embedded document definitions. Defined as an array of name to class mapping.
      *
@@ -374,7 +359,7 @@ abstract class EMongoEmbeddedDocument extends CModel
 	}
 
     /**
-     * Validate current document and all embedded documents.
+     * Validate current document and all loaded or specified embedded documents.
      *
      * @param array|null $attributes  Attributes to validate, or null for all
      * @param boolean    $clearErrors Whether any previous errors should be cleared
@@ -387,16 +372,38 @@ abstract class EMongoEmbeddedDocument extends CModel
     {
         $valid = parent::validate($attributes, $clearErrors);
         if ($this->hasEmbeddedDocuments()) {
-            foreach (array_keys($this->embeddedDocuments()) as $attribute) {
-                if (null !== $this->_embedded->itemAt($attribute)
-                    && (null === $attributes || in_array($attribute, $attributes))
-                ) {
-                    if (! $this->$attribute->validate(null, $clearErrors)) {
+            if (null === $attributes && isset($this->_embedded)) {
+                foreach ($this->_embedded as $attribute => $embedded) {
+                    if (! $embedded->validate(null, $clearErrors)) {
                         $valid = false;
+
+                        // Populate error message with embedded document messages
+                        if ($this->$attribute->hasErrors()) {
+                            foreach ($this->$attribute->getErrors() as $errors) {
+                                foreach ((array) $errors as $error) {
+                                    $this->addError($attribute, $error);
+                                }
+                            }
+                        }
                     }
-                    // Populate error message with embedded document messages
-                    if ($this->$attribute->hasErrors()) {
-                        $this->addErrors($this->$attribute->getErrors());
+                }
+            } elseif (is_array($attributes)) {
+                // If an embedded document is specified in $attributes, validate
+                // regardless of whether its currently loaded or not
+                foreach (array_keys($this->embeddedDocuments()) as $attribute) {
+                    if (in_array($attribute, $attributes)
+                        && ! $this->$attribute->validate(null, $clearErrors)
+                    ) {
+                        $valid = false;
+
+                        // Populate error message with embedded document messages
+                        if ($this->$attribute->hasErrors()) {
+                            foreach ($this->$attribute->getErrors() as $errors) {
+                                foreach ((array) $errors as $error) {
+                                    $this->addError($attribute, $error);
+                                }
+                            }
+                        }
                     }
                 }
             }
