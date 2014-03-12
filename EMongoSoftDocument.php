@@ -149,7 +149,7 @@ abstract class EMongoSoftDocument extends EMongoDocument
 	{
 		$arr = parent::_toArray();
 
-		foreach($this->softAttributes as $key => $value) {
+		foreach ($this->softAttributes as $key => $value) {
 			if (null === $value) {
 				// when a softAttribute has a NULL value, it wants to be excluded
 				unset($arr[$key]);

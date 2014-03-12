@@ -391,7 +391,9 @@ abstract class EMongoEmbeddedDocument extends CModel
                 if (null !== $this->_embedded->itemAt($attribute)
                     && (null === $attributes || in_array($attribute, $attributes))
                 ) {
-                    $valid &= $this->$attribute->validate(null, $clearErrors);
+                    if (! $this->$attribute->validate(null, $clearErrors)) {
+                        $valid = false;
+                    }
                     // Populate error message with embedded document messages
                     if ($this->$attribute->hasErrors()) {
                         $this->addErrors($this->$attribute->getErrors());
