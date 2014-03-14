@@ -201,18 +201,41 @@ abstract class EMongoEmbeddedDocument extends CModel
 			parent::__set($name, $value);
 	}
 
-	/**
-	 * @since v1.3.2
-	 * @see CComponent::__isset()
-	 */
-	public function __isset($name) {
-		if($this->hasEmbeddedDocuments() && isset(self::$_embeddedConfig[get_class($this)][$name]))
-		{
-			return isset($this->_embedded[$name]);
-		}
-		else
-			return parent::__isset($name);
-	}
+    /**
+     * @since v1.3.2
+     * @see CComponent::__isset()
+     */
+    public function __isset($name)
+    {
+        if ($this->hasEmbeddedDocuments()
+            && isset(self::$_embeddedConfig[get_class($this)][$name])
+        ) {
+            if (isset($this->_embedded)) {
+                return $this->_embedded->contains($name);
+            } else {
+                return false;
+            }
+        } else {
+            return parent::__isset($name);
+        }
+    }
+
+    /**
+     * @since v1.4.1
+     * @see CComponent::__unset()
+     */
+    public function __unset($name)
+    {
+        if ($this->hasEmbeddedDocuments()
+            && isset(self::$_embeddedConfig[get_class($this)][$name])
+        ) {
+            if (isset($this->_embedded)) {
+                $this->_embedded->remove($name);
+            }
+        } else {
+            return parrent::__unset($name);
+        }
+    }
 
     /**
      * Embedded document definitions. Defined as an array of name to class mapping.
