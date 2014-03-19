@@ -1785,6 +1785,12 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         $opRegex = '/^(?:\s*(<>|<=|>=|<|>|=|!=|==))?(.*)$/';
 
         foreach ($this->getSafeAttributeNames() as $attribute) {
+            // Ignore unset embedded documents
+            if (isset(self::$_embeddedConfig[get_class($this)][$attribute])
+                && (!isset($this->_embedded) || null === $this->_embedded->itemAt($attribute))
+            ) {
+                continue;
+            }
             if (null !== $this->$attribute && '' !== $this->$attribute) {
                 if (is_array($this->$attribute) || is_object($this->$attribute)) {
                     $criteria->$attribute = $this->$attribute;

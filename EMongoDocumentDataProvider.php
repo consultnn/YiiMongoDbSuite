@@ -200,4 +200,32 @@ class EMongoDocumentDataProvider extends CDataProvider
 		}
 		return $directions;
 	}
+
+    /**
+     * Returns the sorting object. Overriden to ensure model attributes are set on
+     * the CSort object.
+     *
+     * @return CSort|false The sorting object or false if sorting is disabled
+     * @since v1.4.1
+     */
+    public function getSort()
+    {
+        $sort = parent::getSort();
+        if (false !== $sort) {
+            $sort->attributes = $this->model->attributeNames();
+            if ($this->model->hasEmbeddedDocuments()) {
+                foreach ($this->model->embeddedDocuments() as $attribute => $class) {
+                    $doc = $this->model->$attribute;
+                    if ($doc && method_exists($doc, 'attributeNames')) {
+                        foreach ($doc->attributeNames() as $innerAttr) {
+                            // Use dot separator as supported by CHtml::value()
+                            $sort->attributes[] = $attribute . '.' . $innerAttr;
+                        }
+                    }
+                }
+            }
+        }
+
+        return $sort;
+    }
 }
