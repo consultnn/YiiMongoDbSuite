@@ -91,7 +91,7 @@ class EEmbeddedArraysBehavior extends EMongoDocumentBehavior
 	/**
 	 * @since v1.0
 	 */
-	private function parseExistingArray()
+	protected function parseExistingArray()
 	{
 		if(is_array($this->getOwner()->{$this->arrayPropertyName}))
 		{
