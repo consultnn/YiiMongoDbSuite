@@ -116,6 +116,86 @@ Embedded document can be defined in fixtures as array as all the
 difficult work to map embedded documents is done in the EMongoDocument class. 
 
 
+## GridFS documents
+MongoDB stores GridFS files in 2 collections: files and chunks. When specifying a fixture in EMongoDbTestCase, the fixture manager
+will load just the files collection if a class name is provided. To load the GridFS data as well, specify it with a ':' prefix.
+
+### Example Model:
+~~~
+[php]
+
+    class File extends EMongoGridFS
+    {
+        public $name;
+        public $type;
+        public $myAttribute;
+
+        public function getCollectionName()
+        {
+            return 'Files';
+        }
+
+        // ...
+    }
+
+~~~
+
+### Files fixture
+
+fixtures/Files.files.php:
+~~~
+[php]
+return array(
+    'file1' => array(
+        '_id'         => new MongoId('5e2831cde2c3f9181500001c'),
+        'name'        => 'file.png',
+        'type'        => 'image/png',
+        'uploadDate'  => new MongoDate(),
+        'md5'         => 'a824ca31dfc84d6b585804a4056f6d45',
+        'length'      => 1,
+        'chunkSize'   => 1,
+        'myAttribute' => 'value'
+    ),
+);
+
+~~~
+
+fixtures/Files.chunks.php:
+~~~
+[php]
+return array(
+    'file1_chunk0' => array(
+        'files_id' => new MongoId('5e2831cde2c3f9181500001c'),
+        'n'        => 0,
+        'data'     => 'binary data here',
+    ),
+);
+
+~~~
+
+
+### Test
+
+Note that if you're only testing metadata stored with the grid document, you do not need the chunks fixture.
+
+~~~
+[php]
+class FileTest extends EMongoDbTestCase {
+    public $fixtures = array(
+        'files'        => 'File', // or ':Files.files'
+        'files_chunks' => ':Files.chunks',
+    );
+
+    public function testFindFileSize()
+    {
+        $criteria = new EMongoCriteria();
+        $criteria->myAttribute('==', $this->files['file1']['myAttribute']);
+        $fileFromDb = File::model()->find($criteria);
+        $this->assertEquals($fileFromDb->getSize(), $this->files['file1']['length']);
+    }
+}
+~~~
+
 
 ## Multiple database support
 
