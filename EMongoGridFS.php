@@ -253,7 +253,9 @@ abstract class EMongoGridFS extends EMongoDocument
             );
         }
 
-        if (is_file($this->filename)) {
+        if ((null === $attributes || in_array('filename', $attributes))
+            && is_file($this->filename)
+        ) {
             if ($this->deleteByPk($this->_id) !== false) {
                 $result = $this->insertWithPk($this->_id, $attributes);
                 return ($result === true);
