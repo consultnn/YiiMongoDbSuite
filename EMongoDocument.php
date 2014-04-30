@@ -571,9 +571,15 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                     Yii::beginProfile($profile, 'system.db.EMongoDocument');
                 }
                 try {
-                    $this->getCollection()->ensureIndex(
-                        $index['key'], $indexParams
-                    );
+                    if (version_compare(MongoClient::VERSION, '1.5') >= 0) {
+                        $this->getCollection()->createIndex(
+                            $index['key'], $indexParams
+                        );
+                    } else {
+                        $this->getCollection()->ensureIndex(
+                            $index['key'], $indexParams
+                        );
+                    }
                 } catch (MongoCursorException $e) {
                     Yii::log(
                         'Failed to ensureIndex(); retrying. ' . PHP_EOL
@@ -581,9 +587,15 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                         CLogger::LEVEL_WARNING
                     );
 
-                    $this->getCollection()->ensureIndex(
-                        $index['key'], $indexParams
-                    );
+                    if (version_compare(MongoClient::VERSION, '1.5') >= 0) {
+                        $this->getCollection()->ensureIndex(
+                            $index['key'], $indexParams
+                        );
+                    } else {
+                        $this->getCollection()->ensureIndex(
+                            $index['key'], $indexParams
+                        );
+                    }
                 }
 
                 if ($profile) {
