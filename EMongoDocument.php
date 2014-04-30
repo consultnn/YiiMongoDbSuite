@@ -38,8 +38,17 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 	private		static		$_models		= array();
 	private		static		$_indexes		= array();		// Hold collection indexes array
 
-	private 				$_fsyncFlag		= null;			// Object level FSync flag
-	private 				$_safeFlag		= null;			// Object level Safe flag
+    /**
+     * Object level Journaling flag
+     * @var boolean
+     */
+    private $_journalFlag = null;
+
+    /**
+     * Object level write concern flag
+     * @var integer|string
+     */
+    private $_writeConcern	= null;
 
 	protected				$useCursor		= null;			// Whatever to return cursor instead on raw array
 
@@ -292,61 +301,80 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 			$this->_criteria = new EMongoCriteria();
 	}
 
-	/**
-	 * Get FSync flag
-	 *
-	 * It will return the nearest not null value in order:
-	 * - Object level
-	 * - Model level
-	 * - Glopal level (always set)
-	 * @return boolean
-	 */
-	public function getFsyncFlag()
-	{
-		if($this->_fsyncFlag !== null)
-			return $this->_fsyncFlag; // We have flag set, return it
-		if((isset(self::$_models[get_class($this)]) === true) && (self::$_models[get_class($this)]->_fsyncFlag !== null))
-			return self::$_models[get_class($this)]->_fsyncFlag; // Model have flag set, return it
-		return $this->getMongoDBComponent()->fsyncFlag;
-	}
+    /**
+     * Get journaling flag
+     *
+     * It will return the nearest not null value in order:
+     * - Object level
+     * - Model level
+     * - Global level (always set)
+     *
+     * @return boolean
+     */
+    public function getFsyncFlag()
+    {
+        if (null !== $this->_journalFlag) {
+            return $this->_journalFlag; // We have flag set, return it
+        }
+        if (isset(self::$_models[get_class($this)])
+            && (null !== self::$_models[get_class($this)]->_journalFlag)
+        ) {
+            // Model have flag set, return it
+            return self::$_models[get_class($this)]->_journalFlag;
+        }
 
-	/**
-	 * Set object level FSync flag
-	 * @param boolean $flag true|false value for FSync flag
-	 */
-	public function setFsyncFlag($flag)
-	{
-		$this->_fsyncFlag = ($flag == true);
-		if($this->_fsyncFlag)
-			$this->setSafeFlag(true); // Setting FSync flag to true will implicit set safe to true
-	}
+        return $this->getMongoDBComponent()->fsyncFlag;
+    }
 
-	/**
-	 * Get Safe flag
-	 *
-	 * It will return the nearest not null value in order:
-	 * - Object level
-	 * - Model level
-	 * - Glopal level (always set)
-	 * @return boolean
-	 */
-	public function getSafeFlag()
-	{
-		if($this->_safeFlag !== null)
-			return $this->_safeFlag; // We have flag set, return it
-		if((isset(self::$_models[get_class($this)]) === true) && (self::$_models[get_class($this)]->_safeFlag !== null))
-			return self::$_models[get_class($this)]->_safeFlag; // Model have flag set, return it
-		return $this->getMongoDBComponent()->safeFlag;
-	}
+    /**
+     * Set object level journaling flag
+     *
+     * @param boolean $flag true|false value for journaling flag
+     */
+    public function setFsyncFlag($flag)
+    {
+        $this->_journalFlag = ($flag == true);
+        if ($this->_journalFlag && ! $this->_writeConcern) {
+            // Setting Journaling flag to true will implicitly set write concern to 1
+            $this->setSafeFlag(1);
+        }
+    }
 
-	/**
-	 * Set object level Safe flag
-	 * @param boolean $flag true|false value for Safe flag
-	 */
-	public function setSafeFlag($flag)
-	{
-		$this->_safeFlag = ($flag == true);
-	}
+    /**
+     * Get Safe flag (write concern)
+     *
+     * It will return the nearest not null value in order:
+     * - Object level
+     * - Model level
+     * - Global level (always set)
+     *
+     * @return integer|string Write concern value
+     */
+    public function getSafeFlag()
+    {
+        if (null !== $this->_writeConcern) {
+            return $this->_writeConcern; // We have flag set, return it
+        }
+
+        if (isset(self::$_models[get_class($this)])
+            && (null !== self::$_models[get_class($this)]->_writeConcern)
+        ) {
+            // Model have flag set, return it
+            return self::$_models[get_class($this)]->_writeConcern;
+        }
+
+        return $this->getMongoDBComponent()->safeFlag;
+    }
+
+    /**
+     * Set object level Safe flag (write concern)
+     *
+     * @param integer|string $flag Write concern value
+     */
+    public function setSafeFlag($flag)
+    {
+        $this->_writeConcern = $flag;
+    }
 
 	/**
 	 * Get value of use cursor flag
@@ -711,10 +739,10 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      * @throws CDbException                if the record is not new
      * @throws EMongoException             on fail of insert or insert of empty
      *                                     document
-     * @throws MongoCursorException        on fail of insert, when safe flag is set
-     *                                     to true
-     * @throws MongoCursorTimeoutException on timeout of db operation, when safe flag
-     *                                     is set to true
+     * @throws MongoCursorException        on fail of insert, when write concern is
+     *                                     set
+     * @throws MongoCursorTimeoutException on timeout of db operation, when write
+     *                                     concern is set
      * @since v1.0
      */
     public function insert(array $attributes = null)
@@ -758,8 +786,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         try {
             $result = $this->getCollection()->insert(
                 $rawData, array(
-                    'fsync' => $this->getFsyncFlag(),
-                    'safe'  => $this->getSafeFlag(),
+                    'j' => $this->getFsyncFlag(),
+                    'w' => $this->getSafeFlag(),
                 )
             );
         } catch (MongoException $ex) {
@@ -770,8 +798,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             );
             $result = $this->getCollection()->insert(
                 $rawData, array(
-                    'fsync' => $this->getFsyncFlag(),
-                    'safe'  => $this->getSafeFlag(),
+                    'j' => $this->getFsyncFlag(),
+                    'w' => $this->getSafeFlag(),
                 )
             );
         }
@@ -812,10 +840,10 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      *
      * @throws CDbException                if the record is new
      * @throws EMongoException             on fail of update
-     * @throws MongoCursorException        on fail of update, when safe flag is set
-     *                                     to true
-     * @throws MongoCursorTimeoutException on timeout of db operation, when safe flag
-     *                                     is set to true
+     * @throws MongoCursorException        on fail of update, when write concern is
+     *                                     set
+     * @throws MongoCursorTimeoutException on timeout of db operation, when write
+     *                                     concern is set
      * @since v1.0
      */
     public function update(array $attributes = null, $modify = false)
@@ -863,8 +891,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                     array('_id' => $this->_id),
                     array('$set' => $rawData),
                     array(
-                        'fsync'    => $this->getFsyncFlag(),
-                        'safe'     => $this->getSafeFlag(),
+                        'j'        => $this->getFsyncFlag(),
+                        'w'        => $this->getSafeFlag(),
                         'multiple' => false
                     )
                 );
@@ -878,8 +906,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                     array('_id' => $this->_id),
                     array('$set' => $rawData),
                     array(
-                        'fsync'    => $this->getFsyncFlag(),
-                        'safe'     => $this->getSafeFlag(),
+                        'j'        => $this->getFsyncFlag(),
+                        'w'        => $this->getSafeFlag(),
                         'multiple' => false
                     )
                 );
@@ -895,8 +923,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 $result = $this->getCollection()->save(
                     $rawData,
                     array(
-                        'fsync' =>$this->getFsyncFlag(),
-                        'safe'  =>$this->getSafeFlag()
+                        'j' => $this->getFsyncFlag(),
+                        'w' => $this->getSafeFlag(),
                     )
                 );
             } catch (MongoException $ex) {
@@ -908,8 +936,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 $result = $this->getCollection()->save(
                     $rawData,
                     array(
-                        'fsync' =>$this->getFsyncFlag(),
-                        'safe'  =>$this->getSafeFlag()
+                        'j' => $this->getFsyncFlag(),
+                        'w' => $this->getSafeFlag(),
                     )
                 );
             }
@@ -963,8 +991,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 $criteria->getConditions(),
                 $modifier->getModifiers(),
                 array(
-                    'fsync'    => $this->getFsyncFlag(),
-                    'safe'     => $this->getSafeFlag(),
+                    'j'        => $this->getFsyncFlag(),
+                    'w'        => $this->getSafeFlag(),
                     'upsert'   => false,
                     'multiple' => true
                 )
@@ -978,8 +1006,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             $result = $this->getCollection()->update(
                 $criteria->getConditions(), $modifier->getModifiers(),
                 array(
-                    'fsync'    => $this->getFsyncFlag(),
-                    'safe'     => $this->getSafeFlag(),
+                    'j'        => $this->getFsyncFlag(),
+                    'w'        => $this->getSafeFlag(),
                     'upsert'   => false,
                     'multiple' => true
                 )
@@ -1053,8 +1081,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 $criteria->getConditions(),
                 array(
                     'justOne' => true,
-                    'fsync'   => $this->getFsyncFlag(),
-                    'safe'    => $this->getSafeFlag()
+                    'j'       => $this->getFsyncFlag(),
+                    'w'       => $this->getSafeFlag(),
                 )
             );
         } catch (MongoException $ex) {
@@ -1067,8 +1095,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 $criteria->getConditions(),
                 array(
                     'justOne' => true,
-                    'fsync'   => $this->getFsyncFlag(),
-                    'safe'    => $this->getSafeFlag()
+                    'j'       => $this->getFsyncFlag(),
+                    'w'       => $this->getSafeFlag(),
                 )
             );
         }
@@ -1490,8 +1518,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             $result = $this->getCollection()->remove(
                 $criteria->getConditions(), array(
                     'justOne' => false,
-                    'fsync'   => $this->getFsyncFlag(),
-                    'safe'    => $this->getSafeFlag(),
+                    'j'       => $this->getFsyncFlag(),
+                    'w'       => $this->getSafeFlag(),
                 )
             );
         } catch (MongoException $ex) {
@@ -1503,8 +1531,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             $result = $this->getCollection()->remove(
                 $criteria->getConditions(), array(
                     'justOne' => false,
-                    'fsync'   => $this->getFsyncFlag(),
-                    'safe'    => $this->getSafeFlag(),
+                    'j'       => $this->getFsyncFlag(),
+                    'w'       => $this->getSafeFlag(),
                 )
             );
         }
