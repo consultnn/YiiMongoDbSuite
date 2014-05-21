@@ -1764,6 +1764,10 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 			$model->setScenario('update');
 			$model->init();
 
+            // Behaviors have already been attached in the constructor so we need to
+            // prevent duplicates but allow for behaviors that are conditionally
+            // attached based on populated values
+            $model->detachBehaviors();
 			$model->attachBehaviors($model->behaviors());
 
 			if($callAfterFind)
