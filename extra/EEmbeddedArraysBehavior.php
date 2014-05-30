@@ -117,6 +117,23 @@ class EEmbeddedArraysBehavior extends EMongoDocumentBehavior
 		}
 	}
 
+    /**
+     * Values in properties have been converted to embedded documents before
+     * validating.
+     *
+     * @param CModelEvent $event event parameter
+     *
+     * @since v1.4.1
+     */
+    public function beforeValidate($event)
+    {
+        parent::beforeValidate($event);
+        $docs = $this->getOwner()->{$this->arrayPropertyName};
+        if (is_array($docs) && is_array(reset($docs))) {
+            $this->parseExistingArray();
+        }
+    }
+
 	/**
 	 * @since v1.0.2
 	 */
