@@ -118,8 +118,8 @@ class EEmbeddedArraysBehavior extends EMongoDocumentBehavior
 	}
 
     /**
-     * Values in properties have been converted to embedded documents before
-     * validating.
+     * Ensure values in the owner attribute have been converted to embedded documents
+     * before validating.
      *
      * @param CModelEvent $event event parameter
      *
@@ -129,23 +129,34 @@ class EEmbeddedArraysBehavior extends EMongoDocumentBehavior
     {
         parent::beforeValidate($event);
         $docs = $this->getOwner()->{$this->arrayPropertyName};
-        if (is_array($docs) && is_array(reset($docs))) {
-            $this->parseExistingArray();
+        if (is_array($docs)) {
+            if (is_array(reset($docs))) {
+                $this->parseExistingArray();
+            } else {
+                // Clear errors before validation begins
+                foreach ($docs as $doc) {
+                    $doc->clearErrors();
+                }
+           	}
         }
     }
 
-	/**
-	 * @since v1.0.2
-	 */
-	public function afterValidate($event)
-	{
-		parent::afterValidate($event);
-		foreach($this->getOwner()->{$this->arrayPropertyName} as $doc)
-		{
-			if(!$doc->validate())
-				$this->getOwner()->addErrors($doc->getErrors());
-		}
-	}
+    /**
+     * Validate all subdocuments and add errors to the parent object.
+     *
+     * @param CModelEvent $event event parameter
+     *
+     * @since v1.0.2
+     */
+    public function afterValidate($event)
+    {
+        parent::afterValidate($event);
+        foreach ($this->getOwner()->{$this->arrayPropertyName} as $doc) {
+            if (!$doc->validate(null, false)) {
+                $this->getOwner()->addErrors($doc->getErrors());
+            }
+        }
+    }
 
 	public function beforeToArray($event)
 	{
