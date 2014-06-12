@@ -115,6 +115,13 @@ class EMongoDB extends CApplicationComponent
 	 */
 	public $useCursor = false;
 
+    /**
+     * Whether to generate profiler log messages.
+     * @var boolean
+     * @since v1.4.1
+     */
+    public $enableProfiler = false;
+
 	/**
 	 * Storage location for temporary files used by the GridFS Feature.
 	 * If set to null, component will not use temporary storage

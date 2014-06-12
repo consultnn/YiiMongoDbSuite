@@ -59,11 +59,11 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
     protected $ensureIndexes = false;
 
     /**
-     * Whether to generate profiler log messages
+     * Whether to generate profiler log messages. If not set, uses EMongoDB setting.
      * @var boolean
      * @since v1.4.0
      */
-    protected $enableProfiler = false;
+    protected $enableProfiler;
 
     /**
      * Yii application component used to retrieve/identify the EMongoDB instance to
@@ -431,6 +431,10 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      */
     public function getEnableProfiler()
     {
+        if (null === $this->enableProfiler) {
+            return $this->getMongoDBComponent()->enableProfiler;
+        }
+
         return $this->enableProfiler;
     }
 
@@ -588,7 +592,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                     );
 
                     if (version_compare(MongoClient::VERSION, '1.5') >= 0) {
-                        $this->getCollection()->ensureIndex(
+                        $this->getCollection()->createIndex(
                             $index['key'], $indexParams
                         );
                     } else {
