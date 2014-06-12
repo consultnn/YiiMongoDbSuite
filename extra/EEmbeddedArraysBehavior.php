@@ -27,13 +27,31 @@ class EEmbeddedArraysBehavior extends EMongoDocumentBehavior
 	 */
 	public $arrayPropertyName;
 
-	/**
-	 * Class name of doc in array
-	 *
-	 * @var string $arrayDocClassName
-	 * @since v1.0
-	 */
-	public $arrayDocClassName;
+    /**
+     * Class name of doc in array.
+     * If the classField is defined, this will be default class if the value is
+     * missing from the embedded document.
+     *
+     * @var string $arrayDocClassName
+     * @since v1.0
+     */
+    public $arrayDocClassName;
+
+    /**
+     * Name of an attribute on the embedded document that should be appended to the
+     * classPrefix to form the specific class to use.
+     * If the value is not set, arrayDocClassName will be used as a default
+     * @var string|null
+     * @since v1.4.2
+     */
+    public $classField;
+
+    /**
+     * Class name prefix to be prepended to the $classField (if defined)
+     * @var string
+     * @since v1.4.2
+     */
+    public $classPrefix;
 
 	private $_cache;
 
@@ -68,10 +86,6 @@ class EEmbeddedArraysBehavior extends EMongoDocumentBehavior
 	 */
 	public function attach($owner)
 	{
-		// Test if we have correct embding class
-		if(!is_subclass_of($this->arrayDocClassName, 'EMongoEmbeddedDocument'))
-			throw new CException(Yii::t('yii', $this->arrayDocClassName.' is not a child class of EMongoEmbeddedDocument!'));
-
 		$this->_embeddedOwner = !($owner instanceof EMongoDocument);
 
 		parent::attach($owner);
@@ -88,34 +102,45 @@ class EEmbeddedArraysBehavior extends EMongoDocumentBehavior
 		$this->parseExistingArray();
 	}
 
-	/**
-	 * @since v1.0
-	 */
-	protected function parseExistingArray()
-	{
-		if(is_array($this->getOwner()->{$this->arrayPropertyName}))
-		{
-			$arrayOfDocs = array();
-			foreach($this->getOwner()->{$this->arrayPropertyName} as $doc)
-			{
-				$obj = new $this->arrayDocClassName;
-				$obj->setAttributes($doc, false);
-				$obj->setOwner($this->getOwner());
+    /**
+     * @since v1.0
+     */
+    protected function parseExistingArray()
+    {
+        if (! is_array($this->getOwner()->{$this->arrayPropertyName})) {
+            $arrayOfDocs = array();
+            foreach ($this->getOwner()->{$this->arrayPropertyName} as $doc) {
+                // Build the class name if dynamic
+                if ($this->classField && isset($doc[$this->classField])) {
+                    $class = $this->classPrefix . $doc[$this->classField];
+                } else {
+                    $class = $this->arrayDocClassName;
+                }
 
-				// If any EEmbeddedArraysBehavior is attached,
-				// then we should trigger parsing of the newly set
-				// attributes
-				foreach (array_keys($obj->behaviors()) as $name) {
-					$behavior = $obj->asa($name);
-					if ($behavior instanceof EEmbeddedArraysBehavior) {
-						$behavior->parseExistingArray();
-					}
-				}
-				$arrayOfDocs[] = $obj;
-			}
-			$this->getOwner()->{$this->arrayPropertyName} = $arrayOfDocs;
-		}
-	}
+                // Test if we have correct embedding class
+                if (!is_subclass_of($class, 'EMongoEmbeddedDocument')) {
+                    $message = $class
+                        . ' is not a child class of EMongoEmbeddedDocument';
+                    throw new CException(Yii::t('yii', $message));
+                }
+                $obj = new $class;
+                $obj->setAttributes($doc, false);
+                $obj->setOwner($this->getOwner());
+
+                // If any EEmbeddedArraysBehavior is attached,
+                // then we should trigger parsing of the newly set
+                // attributes
+                foreach (array_keys($obj->behaviors()) as $name) {
+                    $behavior = $obj->asa($name);
+                    if ($behavior instanceof EEmbeddedArraysBehavior) {
+                        $behavior->parseExistingArray();
+                    }
+                }
+                $arrayOfDocs[] = $obj;
+            }
+            $this->getOwner()->{$this->arrayPropertyName} = $arrayOfDocs;
+        }
+    }
 
     /**
      * Ensure values in the owner attribute have been converted to embedded documents

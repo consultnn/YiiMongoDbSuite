@@ -12,6 +12,7 @@ Requirements:
 - Reduced boilerplate necessary for individual classes
 - Bug fixes
 - Multiple DB support
+- Dynamic embedded document classes
 
 ## Backwards compatibilty breaks with the parent:
 - EMongoDB::$persistentConnection attribute removed (deprecated in PHP Mongo driver 1.3.0+)

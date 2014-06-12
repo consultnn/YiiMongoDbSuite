@@ -158,48 +158,81 @@ abstract class EMongoEmbeddedDocument extends CModel
 		$this->onAfterEmbeddedDocsInit(new CModelEvent($this));
 	}
 
-	/**
-	 * @since v1.0.8
-	 */
-	public function __get($name)
-	{
-		if($this->hasEmbeddedDocuments() && isset(self::$_embeddedConfig[get_class($this)][$name])) {
-			// Late creation of embedded documents on first access
-			if (is_null($this->_embedded->itemAt($name))) {
-				$docClassName = self::$_embeddedConfig[get_class($this)][$name];
-				$doc = new $docClassName($this->getScenario());
-				$doc->setOwner($this);
-				$this->_embedded->add($name, $doc);
-			}
-			return $this->_embedded->itemAt($name);
-		}
-		else
-			return parent::__get($name);
-	}
+    /**
+     * @since v1.0.8
+     */
+    public function __get($name)
+    {
+        if ($this->hasEmbeddedDocuments()
+            && isset(self::$_embeddedConfig[get_class($this)][$name])
+        ) {
+            // Late creation of embedded documents on first access
+            if (null === $this->_embedded->itemAt($name)) {
+                $docClassName = self::$_embeddedConfig[get_class($this)][$name];
+                if (is_array($docClassName)) {
+                    // Check for a default class to use if not initialized yet
+                    if (isset($docClassName['default'])) {
+                        $docClassName = $docClassName['default'];
+                    } else {
+                        return null;
+                    }
+                }
+                $doc = new $docClassName($this->getScenario());
+                $doc->setOwner($this);
+                $this->_embedded->add($name, $doc);
+            }
 
-	/**
-	 * @since v1.0.8
-	 */
-	public function __set($name, $value)
-	{
-		if($this->hasEmbeddedDocuments() && isset(self::$_embeddedConfig[get_class($this)][$name]))
-		{
-			if(is_array($value)) {
-				// Late creation of embedded documents on first access
-				if (is_null($this->_embedded->itemAt($name))) {
-					$docClassName = self::$_embeddedConfig[get_class($this)][$name];
-					$doc = new $docClassName($this->getScenario());
-					$doc->setOwner($this);
-					$this->_embedded->add($name, $doc);
-				}
-				return $this->_embedded->itemAt($name)->attributes=$value;
-			}
-			else if($value instanceof EMongoEmbeddedDocument)
-				return $this->_embedded->add($name, $value);
-		}
-		else
-			parent::__set($name, $value);
-	}
+            return $this->_embedded->itemAt($name);
+        } else {
+            return parent::__get($name);
+        }
+    }
+
+    /**
+     * @since v1.0.8
+     */
+    public function __set($name, $value)
+    {
+        if ($this->hasEmbeddedDocuments()
+            && isset(self::$_embeddedConfig[get_class($this)][$name])
+        ) {
+            if (is_array($value)) {
+                // Late creation of embedded documents on first access
+                if (null === $this->_embedded->itemAt($name)) {
+                    $docClassName = self::$_embeddedConfig[get_class($this)][$name];
+                    if (is_array($docClassName)) {
+                        if (! isset($docClassName['classField'])) {
+                            throw new CException(
+                                'Invalid embeddedDocument definition for'
+                                . get_class($this) . '->' . $name
+                            );
+                        }
+                        if (! empty($values[$docClassName['classField']])) {
+                            $docClassName = (isset($docClassName['prefix']) ? $docClassName['prefix'] : '') .
+                                $docClassName['classField'];
+                        } elseif (isset($docClassName['default'])) {
+                            // Fallback to default if defined
+                            $docClassName = $docClassName['default'];
+                        } else {
+                            throw new CException(
+                                'Unable to determine embedded document class for '
+                                . get_class($this) . '->' . $name
+                            );
+                        }
+                    }
+                    $doc = new $docClassName($this->getScenario());
+                    $doc->setOwner($this);
+                    $this->_embedded->add($name, $doc);
+                }
+
+                return $this->_embedded->itemAt($name)->attributes = $value;
+            } elseif ($value instanceof EMongoEmbeddedDocument) {
+                return $this->_embedded->add($name, $value);
+            }
+        } else {
+            parent::__set($name, $value);
+        }
+    }
 
     /**
      * @since v1.3.2
@@ -240,7 +273,20 @@ abstract class EMongoEmbeddedDocument extends CModel
     /**
      * Embedded document definitions. Defined as an array of name to class mapping.
      *
+     * For a dynamic class, the class name should be an array with the following
+     * parameters: 'prefix' (optional), 'classField', 'default' (optional). The
+     * resulting class name would be the prefix (if any) concatenated with the value
+     * of the classField in the embedded document's value.
+     * The default class is used when attempting the load the embedded document
+     * without specifying any values. Otherwise null will be returned.
+     * Example: an embedded document with an attribute 't' that contains the value
+     * 'SoftEmbeddedDocument' and a prefix of 'EMongo' would result in an class of
+     * 'EMongoSoftEmbeddedDocument' being generated.
+     *
+     *
      * @example array('property' => 'EMongoEmbeddedDocumentClass')
+     * @example array('property' => array('prefix' => 'EMongo', 'classField' => 't'))
+     *
      * @since v1.0.8
      * @return array
      */
