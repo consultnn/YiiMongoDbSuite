@@ -107,7 +107,7 @@ class EEmbeddedArraysBehavior extends EMongoDocumentBehavior
      */
     protected function parseExistingArray()
     {
-        if (! is_array($this->getOwner()->{$this->arrayPropertyName})) {
+        if (is_array($this->getOwner()->{$this->arrayPropertyName})) {
             $arrayOfDocs = array();
             foreach ($this->getOwner()->{$this->arrayPropertyName} as $doc) {
                 // Build the class name if dynamic
@@ -176,9 +176,11 @@ class EEmbeddedArraysBehavior extends EMongoDocumentBehavior
     public function afterValidate($event)
     {
         parent::afterValidate($event);
-        foreach ($this->getOwner()->{$this->arrayPropertyName} as $doc) {
-            if (!$doc->validate(null, false)) {
-                $this->getOwner()->addErrors($doc->getErrors());
+        if (is_array($this->getOwner()->{$this->arrayPropertyName})) {
+            foreach ($this->getOwner()->{$this->arrayPropertyName} as $doc) {
+                if (!$doc->validate(null, false)) {
+                    $this->getOwner()->addErrors($doc->getErrors());
+                }
             }
         }
     }
