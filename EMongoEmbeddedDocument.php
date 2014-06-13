@@ -207,9 +207,9 @@ abstract class EMongoEmbeddedDocument extends CModel
                                 . get_class($this) . '->' . $name
                             );
                         }
-                        if (! empty($values[$docClassName['classField']])) {
-                            $docClassName = (isset($docClassName['prefix']) ? $docClassName['prefix'] : '') .
-                                $docClassName['classField'];
+                        if (! empty($value[$docClassName['classField']])) {
+                            $docClassName = (isset($docClassName['prefix']) ? $docClassName['prefix'] : '')
+                                . $value[$docClassName['classField']];
                         } elseif (isset($docClassName['default'])) {
                             // Fallback to default if defined
                             $docClassName = $docClassName['default'];

@@ -448,34 +448,53 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         $this->enableProfiler = (boolean) $profiler;
     }
 
-	/**
-	 * Sets the attribute values in a massive way.
-	 * @param array $values attribute values (name=>value) to be set.
-	 * @param boolean $safeOnly whether the assignments should only be done to the safe attributes.
-	 * A safe attribute is one that is associated with a validation rule in the current {@link scenario}.
-	 * @see getSafeAttributeNames
-	 * @see attributeNames
-	 * @since v1.3.1
-	 */
-	public function setAttributes($values, $safeOnly=true)
-	{
-		if(!is_array($values))
-			return;
+    /**
+     * Sets the attribute values in a massive way.
+     *
+     * @param array   $values   Attribute values (name=>value) to be set.
+     * @param boolean $safeOnly Whether the assignments should only be done to the
+     *                          safe attributes. A safe attribute is one that is
+     *                          associated with a validation rule in the current
+     *                          {@link scenario}.
+     *
+     * @see getSafeAttributeNames
+     * @see attributeNames
+     * @since v1.3.1
+     */
+    public function setAttributes($values, $safeOnly = true)
+    {
+        if (!is_array($values)) {
+            return;
+        }
 
-		if($this->hasEmbeddedDocuments())
-		{
-			$attributes=array_flip($safeOnly ? $this->getSafeAttributeNames() : $this->attributeNames());
+        if ($this->hasEmbeddedDocuments()) {
+            $attributes = array_flip(
+                $safeOnly ? $this->getSafeAttributeNames() : $this->attributeNames()
+            );
 
-			foreach($this->embeddedDocuments() as $fieldName => $className)
-				if(isset($values[$fieldName]) && isset($attributes[$fieldName]))
-				{
-					$this->$fieldName->setAttributes($values[$fieldName], $safeOnly);
-					unset($values[$fieldName]);
-				}
-		}
+            foreach ($this->embeddedDocuments() as $fieldName => $className) {
+                if (isset($values[$fieldName]) && isset($attributes[$fieldName])) {
+                    if (is_array($className)
+                        && isset($values[$fieldName][$className['classField']])
+                    ) {
+                        // Ensure the embedded document is sufficiently setup
+                        $this->__set(
+                            $fieldName, array(
+                                $className['classField']
+                                    => $values[$fieldName][$className['classField']]
+                            )
+                        );
+                    }
+                    $this->$fieldName->setAttributes(
+                        $values[$fieldName], $safeOnly
+                    );
+                    unset($values[$fieldName]);
+                }
+            }
+        }
 
-		parent::setAttributes($values, $safeOnly);
-	}
+        parent::setAttributes($values, $safeOnly);
+    }
 
     /**
      * This function check indexes and applies them to the collection if needed
