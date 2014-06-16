@@ -520,7 +520,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 
             try {
                 $indexInfo = $this->getCollection()->getIndexInfo();
-            } catch (MongoException $e) {
+            } catch (MongoException $ex) {
                 Yii::log(
                     'Failed to retreive index info; retrying. ' . PHP_EOL
                     . 'Error: ' . $ex->getMessage(),
@@ -603,7 +603,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                             $index['key'], $indexParams
                         );
                     }
-                } catch (MongoCursorException $e) {
+                } catch (MongoCursorException $ex) {
                     Yii::log(
                         'Failed to ensureIndex(); retrying. ' . PHP_EOL
                         . 'Error: ' . $ex->getMessage(),
@@ -1168,7 +1168,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         }
         try {
             $count = $this->getCollection()->count(array('_id' => $this->_id));
-        } catch (MongoException $e) {
+        } catch (MongoException $ex) {
             Yii::log(
                 'Failed to submit count for refresh(); retrying. ' . PHP_EOL
                 . 'Error: ' . $ex->getMessage(),

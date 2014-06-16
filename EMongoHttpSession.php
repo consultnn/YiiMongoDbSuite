@@ -137,7 +137,7 @@ class EMongoHttpSession extends CHttpSession
             $data = $this->_collection->findOne(
                 array($this->idColumn => $id), array($this->dataColumn => true)
             );
-        } catch (MongoException $e) {
+        } catch (MongoException $ex) {
             // Try again if switching master or timeout
             Yii::log(
                 'Failed attempting to retrieve session data; trying again.'
