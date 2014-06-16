@@ -31,8 +31,14 @@ class EMongoValidator extends CValidator
     const TYPE_DATE = 'date';
 
     /**
+     * Validate for a UUIDv4 stored as a MongoBinData object
+     * @var string
+     */
+    const TYPE_UUID = 'uuid';
+
+    /**
      * The data type that the attribute should be. Defaults to TYPE_OBJECT_ID.
-     * Valid values include TYPE_OBJECT_ID, TYPE_DATE.
+     * Valid values include TYPE_OBJECT_ID, TYPE_DATE, TYPE_UUID.
      * @var string
      */
     public $type = self::TYPE_OBJECT_ID;
@@ -97,6 +103,34 @@ class EMongoValidator extends CValidator
 
                     if (!$value instanceof MongoDate) {
                         $msg = '{attribute} must be an instance of MongoDate.';
+                    }
+                    break;
+                case self::TYPE_UUID:
+                    $regex = '/^[a-f0-9]{8}[a-f0-9]{4}4[a-f0-9]{3}[89aAbB]'
+                        . '[a-f0-9]{3}[a-f0-9]{12}$/i';
+
+                    // Prefer newer UUID type if available
+                    $uuidTypes = array(MongoBinData::UUID);
+                    if (version_compare(MongoClient::VERSION, '1.5') >= 0) {
+                        $type = MongoBinData::UUID_RFC4122;
+                        $uuidTypes[] = $type;
+                    } else {
+                        $type = MongoBinData::UUID;
+                    }
+                    if ($this->filter && is_string($value)) {
+                        // Strip any dashes used in displayed representations
+                        $value = str_replace('-', '', $value);
+                        if (preg_match($regex, $value)) {
+                            $value = new MongoBinData($value, $type);
+                        }
+                    }
+
+                    if (!$value instanceof MongoBinData) {
+                        $msg = '{attribute} must be an instance of MongoBinData.';
+                    } elseif (! in_array($value->type, $uuidTypes)) {
+                        $msg = '{attribute} must be of type UUID.';
+                    } elseif (! preg_match($regex, $value->bin)) {
+                        $msg = '{attribute} must be a valid UUID.';
                     }
                     break;
                 default:
