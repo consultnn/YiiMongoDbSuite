@@ -826,6 +826,10 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 )
             );
         } catch (MongoException $ex) {
+            // Do not attempt retry for duplicate key errors
+            if ($ex instanceof MongoCursorException && $ex->getCode() === 11000) {
+                throw $ex;
+            }
             Yii::log(
                 'Failed to submit insert(); retrying. ' . PHP_EOL
                 . 'Error: ' . $ex->getMessage(),
@@ -932,6 +936,11 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                     )
                 );
             } catch (MongoException $ex) {
+                // Do not attempt retry for duplicate key errors
+                if ($ex instanceof MongoCursorException && $ex->getCode() === 11000) {
+                    throw $ex;
+                }
+
                 Yii::log(
                     'Failed to submit update(); retrying. ' . PHP_EOL
                     . 'Error: ' . $ex->getMessage(),
@@ -963,6 +972,13 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                     )
                 );
             } catch (MongoException $ex) {
+                // Do not attempt retry for duplicate key errors
+                if ($ex instanceof MongoCursorException
+                    && $ex->getCode() === 11000
+                ) {
+                    throw $ex;
+                }
+
                 Yii::log(
                     'Failed to submit update(); retrying. ' . PHP_EOL
                     . 'Error: ' . $ex->getMessage(),
