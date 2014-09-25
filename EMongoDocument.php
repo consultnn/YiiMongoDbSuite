@@ -871,7 +871,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      *
      * @param array   $attributes list of attributes that need to be saved. Defaults
      *                            to null, meaning all attributes that are loaded
-     *                            from DB will be saved.
+     *                            from DB will be saved. Embedded attributes may be
+     *                            specified using the dot notation (e.g. 'a.b').
      * @param boolean $modify     if set true only selected attributes will be
      *                            replaced, and not the whole document
      *
@@ -905,11 +906,28 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 $attributes[] = '_id'; // This is very easy to forget
             }
 
-            foreach ($rawData as $key => $value) {
-                if (!in_array($key, $attributes)) {
-                    unset($rawData[$key]);
+            $data = [];
+            foreach ($attributes as $attrib) {
+                // Check if subdocument attributes are set to be updated
+                if (false !== strpos($attrib, '.')) {
+                    $values = $rawData;
+                    // Get the value for the inner attribute specified
+                    foreach (explode('.', $attrib) as $key) {
+                        if (!is_array($values) || !array_key_exists($key, $values)) {
+                            $message = Yii::t(
+                                'Attribute {attr} does not exist on {doc}',
+                                array('attr' => $attrib, 'doc' => get_class($this)));
+                            throw new EMongoException($message);
+                        }
+                        $values = $values[$key];
+                    }
+                    $data[$attrib] = $values;
+                } elseif (array_key_exists($attrib, $rawData)) {
+                    $data[$attrib] = $rawData[$attrib];
                 }
             }
+
+            $rawData = $data;
         }
 
         $profile = $this->getEnableProfiler();
@@ -920,11 +938,11 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             }
             if ($profile) {
                 $profile = EMongoCriteria::commandToString(
-                    'update', $this->getCollectionName(), array('_id' => $this->_id),
-                    array('$set' => $rawData)
-                );
+                    'update', $this->getCollectionName(),
+                    array('_id' => $this->_id), array('$set' => $rawData));
                 Yii::beginProfile($profile, 'system.db.EMongoDocument');
             }
+
             try {
                 $result = $this->getCollection()->update(
                     array('_id' => $this->_id),
@@ -937,7 +955,9 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 );
             } catch (MongoException $ex) {
                 // Do not attempt retry for duplicate key errors
-                if ($ex instanceof MongoCursorException && $ex->getCode() === 11000) {
+                if ($ex instanceof MongoCursorException
+                    && $ex->getCode() === 11000
+                ) {
                     throw $ex;
                 }
 
