@@ -914,9 +914,10 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                     // Get the value for the inner attribute specified
                     foreach (explode('.', $attrib) as $key) {
                         if (!is_array($values) || !array_key_exists($key, $values)) {
-                            $message = Yii::t(
-                                'Attribute {attr} does not exist on {doc}',
-                                array('attr' => $attrib, 'doc' => get_class($this)));
+                            $message = Yii::t('yii',
+                                'Attribute {attr} does not exist on {doc}', array(
+                                    '{attr}' => $attrib, '{doc}' => get_class($this)
+                                ));
                             throw new EMongoException($message);
                         }
                         $values = $values[$key];
