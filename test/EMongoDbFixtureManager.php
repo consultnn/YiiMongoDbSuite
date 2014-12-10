@@ -243,6 +243,7 @@ class EMongoDbFixtureManager extends CApplicationComponent
      * Note, if a collection does not have fixture data, {@link resetCollection}
      * will still be called to reset the table. Also note that indexes will be
      * forcibly ensured if defined in the model.
+     * To load GridDocument file data, use ':' prefix to specify chunks collections.
      *
      * @param array $fixtures Fixtures to be loaded. The array keys are fixture
      *                        names, and the array values are either EMongoDocument
@@ -267,6 +268,10 @@ class EMongoDbFixtureManager extends CApplicationComponent
                 $model->setEnsureIndexes(true);
                 $model->init();
                 $collectionName = $model->getCollectionName();
+                // If a grid document fixture, assume metadata
+                if ($model instanceof EMongoGridFS) {
+                    $collectionName .= '.files';
+                }
             }
             $this->resetCollection($collectionName);
             $rows = $this->loadFixture($collectionName);

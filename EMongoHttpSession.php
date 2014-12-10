@@ -27,8 +27,8 @@
  * idColumn             : id column name                : default id
  * dataColumn           : data column name              : default dada
  * expireColumn         : expire column name            : default expire
- * fsync                : fsync flag                    : default false
- * safe                 : safe flag                     : default false
+ * fsync                : journaling flag               : default false
+ * safe                 : write concern                 : default 0
  * queryTimeout         : timeout miliseconds           : default null
  *
  */
@@ -59,9 +59,10 @@ class EMongoHttpSession extends CHttpSession
      */
     protected $fsync = false;
     /**
-     * @var boolean the program will wait for the database response.
+     * Controls whether/how to wait for a database response
+     * @var integer|string
      */
-    protected $safe = false;
+    protected $safe = 0;
     /**
      * @var integer if "safe" is set, this sets how long (in milliseconds) for the client to wait for a database response.
      */
@@ -109,11 +110,11 @@ class EMongoHttpSession extends CHttpSession
     {
         $this->setCollection($this->collectionName);
         $this->_options = array(
-            'fsync' => $this->fsync,
-            'safe'  => $this->safe
+            'j' => $this->fsync,
+            'w' => $this->safe
         );
         if (null !== $this->updateTimeout) {
-            $this->_options['timeout'] = $this->updateTimeout;
+            $this->_options['socketTimeoutMS'] = $this->updateTimeout;
         }
         parent::init();
     }
@@ -136,7 +137,7 @@ class EMongoHttpSession extends CHttpSession
             $data = $this->_collection->findOne(
                 array($this->idColumn => $id), array($this->dataColumn => true)
             );
-        } catch (MongoException $e) {
+        } catch (MongoException $ex) {
             // Try again if switching master or timeout
             Yii::log(
                 'Failed attempting to retrieve session data; trying again.'
@@ -421,17 +422,17 @@ class EMongoHttpSession extends CHttpSession
     public function setFsync($fsync)
     {
         $this->fsync = (bool) $fsync;
-        $this->_options['fsync'] = (bool) $fsync;
+        $this->_options['j'] = (bool) $fsync;
     }
 
     /**
-     * Set the safe mode flag for insert/update
+     * Set the write concern for insert/update
      *
-     * @param boolean $safe Whether safe mode should be set
+     * @param string|integer $safe Write concern to be set
      */
     public function setSafe($safe)
     {
-        $this->safe = (bool) $safe;
-        $this->_options['safe'] = (bool) $safe;
+        $this->safe = $safe;
+        $this->_options['w'] = $safe;
     }
 }

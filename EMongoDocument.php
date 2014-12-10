@@ -38,8 +38,17 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 	private		static		$_models		= array();
 	private		static		$_indexes		= array();		// Hold collection indexes array
 
-	private 				$_fsyncFlag		= null;			// Object level FSync flag
-	private 				$_safeFlag		= null;			// Object level Safe flag
+    /**
+     * Object level Journaling flag
+     * @var boolean
+     */
+    private $_journalFlag = null;
+
+    /**
+     * Object level write concern flag
+     * @var integer|string
+     */
+    private $_writeConcern	= null;
 
 	protected				$useCursor		= null;			// Whatever to return cursor instead on raw array
 
@@ -50,11 +59,11 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
     protected $ensureIndexes = false;
 
     /**
-     * Whether to generate profiler log messages
+     * Whether to generate profiler log messages. If not set, uses EMongoDB setting.
      * @var boolean
      * @since v1.4.0
      */
-    protected $enableProfiler = false;
+    protected $enableProfiler;
 
     /**
      * Yii application component used to retrieve/identify the EMongoDB instance to
@@ -292,61 +301,80 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 			$this->_criteria = new EMongoCriteria();
 	}
 
-	/**
-	 * Get FSync flag
-	 *
-	 * It will return the nearest not null value in order:
-	 * - Object level
-	 * - Model level
-	 * - Glopal level (always set)
-	 * @return boolean
-	 */
-	public function getFsyncFlag()
-	{
-		if($this->_fsyncFlag !== null)
-			return $this->_fsyncFlag; // We have flag set, return it
-		if((isset(self::$_models[get_class($this)]) === true) && (self::$_models[get_class($this)]->_fsyncFlag !== null))
-			return self::$_models[get_class($this)]->_fsyncFlag; // Model have flag set, return it
-		return $this->getMongoDBComponent()->fsyncFlag;
-	}
+    /**
+     * Get journaling flag
+     *
+     * It will return the nearest not null value in order:
+     * - Object level
+     * - Model level
+     * - Global level (always set)
+     *
+     * @return boolean
+     */
+    public function getFsyncFlag()
+    {
+        if (null !== $this->_journalFlag) {
+            return $this->_journalFlag; // We have flag set, return it
+        }
+        if (isset(self::$_models[get_class($this)])
+            && (null !== self::$_models[get_class($this)]->_journalFlag)
+        ) {
+            // Model have flag set, return it
+            return self::$_models[get_class($this)]->_journalFlag;
+        }
 
-	/**
-	 * Set object level FSync flag
-	 * @param boolean $flag true|false value for FSync flag
-	 */
-	public function setFsyncFlag($flag)
-	{
-		$this->_fsyncFlag = ($flag == true);
-		if($this->_fsyncFlag)
-			$this->setSafeFlag(true); // Setting FSync flag to true will implicit set safe to true
-	}
+        return $this->getMongoDBComponent()->fsyncFlag;
+    }
 
-	/**
-	 * Get Safe flag
-	 *
-	 * It will return the nearest not null value in order:
-	 * - Object level
-	 * - Model level
-	 * - Glopal level (always set)
-	 * @return boolean
-	 */
-	public function getSafeFlag()
-	{
-		if($this->_safeFlag !== null)
-			return $this->_safeFlag; // We have flag set, return it
-		if((isset(self::$_models[get_class($this)]) === true) && (self::$_models[get_class($this)]->_safeFlag !== null))
-			return self::$_models[get_class($this)]->_safeFlag; // Model have flag set, return it
-		return $this->getMongoDBComponent()->safeFlag;
-	}
+    /**
+     * Set object level journaling flag
+     *
+     * @param boolean $flag true|false value for journaling flag
+     */
+    public function setFsyncFlag($flag)
+    {
+        $this->_journalFlag = ($flag == true);
+        if ($this->_journalFlag && ! $this->_writeConcern) {
+            // Setting Journaling flag to true will implicitly set write concern to 1
+            $this->setSafeFlag(1);
+        }
+    }
 
-	/**
-	 * Set object level Safe flag
-	 * @param boolean $flag true|false value for Safe flag
-	 */
-	public function setSafeFlag($flag)
-	{
-		$this->_safeFlag = ($flag == true);
-	}
+    /**
+     * Get Safe flag (write concern)
+     *
+     * It will return the nearest not null value in order:
+     * - Object level
+     * - Model level
+     * - Global level (always set)
+     *
+     * @return integer|string Write concern value
+     */
+    public function getSafeFlag()
+    {
+        if (null !== $this->_writeConcern) {
+            return $this->_writeConcern; // We have flag set, return it
+        }
+
+        if (isset(self::$_models[get_class($this)])
+            && (null !== self::$_models[get_class($this)]->_writeConcern)
+        ) {
+            // Model have flag set, return it
+            return self::$_models[get_class($this)]->_writeConcern;
+        }
+
+        return $this->getMongoDBComponent()->safeFlag;
+    }
+
+    /**
+     * Set object level Safe flag (write concern)
+     *
+     * @param integer|string $flag Write concern value
+     */
+    public function setSafeFlag($flag)
+    {
+        $this->_writeConcern = $flag;
+    }
 
 	/**
 	 * Get value of use cursor flag
@@ -403,6 +431,10 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      */
     public function getEnableProfiler()
     {
+        if (null === $this->enableProfiler) {
+            return $this->getMongoDBComponent()->enableProfiler;
+        }
+
         return $this->enableProfiler;
     }
 
@@ -416,34 +448,53 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         $this->enableProfiler = (boolean) $profiler;
     }
 
-	/**
-	 * Sets the attribute values in a massive way.
-	 * @param array $values attribute values (name=>value) to be set.
-	 * @param boolean $safeOnly whether the assignments should only be done to the safe attributes.
-	 * A safe attribute is one that is associated with a validation rule in the current {@link scenario}.
-	 * @see getSafeAttributeNames
-	 * @see attributeNames
-	 * @since v1.3.1
-	 */
-	public function setAttributes($values, $safeOnly=true)
-	{
-		if(!is_array($values))
-			return;
+    /**
+     * Sets the attribute values in a massive way.
+     *
+     * @param array   $values   Attribute values (name=>value) to be set.
+     * @param boolean $safeOnly Whether the assignments should only be done to the
+     *                          safe attributes. A safe attribute is one that is
+     *                          associated with a validation rule in the current
+     *                          {@link scenario}.
+     *
+     * @see getSafeAttributeNames
+     * @see attributeNames
+     * @since v1.3.1
+     */
+    public function setAttributes($values, $safeOnly = true)
+    {
+        if (!is_array($values)) {
+            return;
+        }
 
-		if($this->hasEmbeddedDocuments())
-		{
-			$attributes=array_flip($safeOnly ? $this->getSafeAttributeNames() : $this->attributeNames());
+        if ($this->hasEmbeddedDocuments()) {
+            $attributes = array_flip(
+                $safeOnly ? $this->getSafeAttributeNames() : $this->attributeNames()
+            );
 
-			foreach($this->embeddedDocuments() as $fieldName => $className)
-				if(isset($values[$fieldName]) && isset($attributes[$fieldName]))
-				{
-					$this->$fieldName->setAttributes($values[$fieldName], $safeOnly);
-					unset($values[$fieldName]);
-				}
-		}
+            foreach ($this->embeddedDocuments() as $fieldName => $className) {
+                if (isset($values[$fieldName]) && isset($attributes[$fieldName])) {
+                    if (is_array($className)
+                        && isset($values[$fieldName][$className['classField']])
+                    ) {
+                        // Ensure the embedded document is sufficiently setup
+                        $this->__set(
+                            $fieldName, array(
+                                $className['classField']
+                                    => $values[$fieldName][$className['classField']]
+                            )
+                        );
+                    }
+                    $this->$fieldName->setAttributes(
+                        $values[$fieldName], $safeOnly
+                    );
+                    unset($values[$fieldName]);
+                }
+            }
+        }
 
-		parent::setAttributes($values, $safeOnly);
-	}
+        parent::setAttributes($values, $safeOnly);
+    }
 
     /**
      * This function check indexes and applies them to the collection if needed
@@ -469,7 +520,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 
             try {
                 $indexInfo = $this->getCollection()->getIndexInfo();
-            } catch (MongoException $e) {
+            } catch (MongoException $ex) {
                 Yii::log(
                     'Failed to retreive index info; retrying. ' . PHP_EOL
                     . 'Error: ' . $ex->getMessage(),
@@ -543,19 +594,31 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                     Yii::beginProfile($profile, 'system.db.EMongoDocument');
                 }
                 try {
-                    $this->getCollection()->ensureIndex(
-                        $index['key'], $indexParams
-                    );
-                } catch (MongoCursorException $e) {
+                    if (version_compare(MongoClient::VERSION, '1.5') >= 0) {
+                        $this->getCollection()->createIndex(
+                            $index['key'], $indexParams
+                        );
+                    } else {
+                        $this->getCollection()->ensureIndex(
+                            $index['key'], $indexParams
+                        );
+                    }
+                } catch (MongoCursorException $ex) {
                     Yii::log(
                         'Failed to ensureIndex(); retrying. ' . PHP_EOL
                         . 'Error: ' . $ex->getMessage(),
                         CLogger::LEVEL_WARNING
                     );
 
-                    $this->getCollection()->ensureIndex(
-                        $index['key'], $indexParams
-                    );
+                    if (version_compare(MongoClient::VERSION, '1.5') >= 0) {
+                        $this->getCollection()->createIndex(
+                            $index['key'], $indexParams
+                        );
+                    } else {
+                        $this->getCollection()->ensureIndex(
+                            $index['key'], $indexParams
+                        );
+                    }
                 }
 
                 if ($profile) {
@@ -711,10 +774,10 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      * @throws CDbException                if the record is not new
      * @throws EMongoException             on fail of insert or insert of empty
      *                                     document
-     * @throws MongoCursorException        on fail of insert, when safe flag is set
-     *                                     to true
-     * @throws MongoCursorTimeoutException on timeout of db operation, when safe flag
-     *                                     is set to true
+     * @throws MongoCursorException        on fail of insert, when write concern is
+     *                                     set
+     * @throws MongoCursorTimeoutException on timeout of db operation, when write
+     *                                     concern is set
      * @since v1.0
      */
     public function insert(array $attributes = null)
@@ -758,11 +821,15 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         try {
             $result = $this->getCollection()->insert(
                 $rawData, array(
-                    'fsync' => $this->getFsyncFlag(),
-                    'safe'  => $this->getSafeFlag(),
+                    'j' => $this->getFsyncFlag(),
+                    'w' => $this->getSafeFlag(),
                 )
             );
         } catch (MongoException $ex) {
+            // Do not attempt retry for duplicate key errors
+            if ($ex instanceof MongoCursorException && $ex->getCode() === 11000) {
+                throw $ex;
+            }
             Yii::log(
                 'Failed to submit insert(); retrying. ' . PHP_EOL
                 . 'Error: ' . $ex->getMessage(),
@@ -770,8 +837,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             );
             $result = $this->getCollection()->insert(
                 $rawData, array(
-                    'fsync' => $this->getFsyncFlag(),
-                    'safe'  => $this->getSafeFlag(),
+                    'j' => $this->getFsyncFlag(),
+                    'w' => $this->getSafeFlag(),
                 )
             );
         }
@@ -804,7 +871,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      *
      * @param array   $attributes list of attributes that need to be saved. Defaults
      *                            to null, meaning all attributes that are loaded
-     *                            from DB will be saved.
+     *                            from DB will be saved. Embedded attributes may be
+     *                            specified using the dot notation (e.g. 'a.b').
      * @param boolean $modify     if set true only selected attributes will be
      *                            replaced, and not the whole document
      *
@@ -812,10 +880,10 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      *
      * @throws CDbException                if the record is new
      * @throws EMongoException             on fail of update
-     * @throws MongoCursorException        on fail of update, when safe flag is set
-     *                                     to true
-     * @throws MongoCursorTimeoutException on timeout of db operation, when safe flag
-     *                                     is set to true
+     * @throws MongoCursorException        on fail of update, when write concern is
+     *                                     set
+     * @throws MongoCursorTimeoutException on timeout of db operation, when write
+     *                                     concern is set
      * @since v1.0
      */
     public function update(array $attributes = null, $modify = false)
@@ -838,11 +906,29 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 $attributes[] = '_id'; // This is very easy to forget
             }
 
-            foreach ($rawData as $key => $value) {
-                if (!in_array($key, $attributes)) {
-                    unset($rawData[$key]);
+            $data = [];
+            foreach ($attributes as $attrib) {
+                // Check if subdocument attributes are set to be updated
+                if (false !== strpos($attrib, '.')) {
+                    $values = $rawData;
+                    // Get the value for the inner attribute specified
+                    foreach (explode('.', $attrib) as $key) {
+                        if (!is_array($values) || !array_key_exists($key, $values)) {
+                            $message = Yii::t('yii',
+                                'Attribute {attr} does not exist on {doc}', array(
+                                    '{attr}' => $attrib, '{doc}' => get_class($this)
+                                ));
+                            throw new EMongoException($message);
+                        }
+                        $values = $values[$key];
+                    }
+                    $data[$attrib] = $values;
+                } elseif (array_key_exists($attrib, $rawData)) {
+                    $data[$attrib] = $rawData[$attrib];
                 }
             }
+
+            $rawData = $data;
         }
 
         $profile = $this->getEnableProfiler();
@@ -853,22 +939,29 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             }
             if ($profile) {
                 $profile = EMongoCriteria::commandToString(
-                    'update', $this->getCollectionName(), array('_id' => $this->_id),
-                    array('$set' => $rawData)
-                );
+                    'update', $this->getCollectionName(),
+                    array('_id' => $this->_id), array('$set' => $rawData));
                 Yii::beginProfile($profile, 'system.db.EMongoDocument');
             }
+
             try {
                 $result = $this->getCollection()->update(
                     array('_id' => $this->_id),
                     array('$set' => $rawData),
                     array(
-                        'fsync'    => $this->getFsyncFlag(),
-                        'safe'     => $this->getSafeFlag(),
+                        'j'        => $this->getFsyncFlag(),
+                        'w'        => $this->getSafeFlag(),
                         'multiple' => false
                     )
                 );
             } catch (MongoException $ex) {
+                // Do not attempt retry for duplicate key errors
+                if ($ex instanceof MongoCursorException
+                    && $ex->getCode() === 11000
+                ) {
+                    throw $ex;
+                }
+
                 Yii::log(
                     'Failed to submit update(); retrying. ' . PHP_EOL
                     . 'Error: ' . $ex->getMessage(),
@@ -878,8 +971,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                     array('_id' => $this->_id),
                     array('$set' => $rawData),
                     array(
-                        'fsync'    => $this->getFsyncFlag(),
-                        'safe'     => $this->getSafeFlag(),
+                        'j'        => $this->getFsyncFlag(),
+                        'w'        => $this->getSafeFlag(),
                         'multiple' => false
                     )
                 );
@@ -895,11 +988,18 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 $result = $this->getCollection()->save(
                     $rawData,
                     array(
-                        'fsync' =>$this->getFsyncFlag(),
-                        'safe'  =>$this->getSafeFlag()
+                        'j' => $this->getFsyncFlag(),
+                        'w' => $this->getSafeFlag(),
                     )
                 );
             } catch (MongoException $ex) {
+                // Do not attempt retry for duplicate key errors
+                if ($ex instanceof MongoCursorException
+                    && $ex->getCode() === 11000
+                ) {
+                    throw $ex;
+                }
+
                 Yii::log(
                     'Failed to submit update(); retrying. ' . PHP_EOL
                     . 'Error: ' . $ex->getMessage(),
@@ -908,8 +1008,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 $result = $this->getCollection()->save(
                     $rawData,
                     array(
-                        'fsync' =>$this->getFsyncFlag(),
-                        'safe'  =>$this->getSafeFlag()
+                        'j' => $this->getFsyncFlag(),
+                        'w' => $this->getSafeFlag(),
                     )
                 );
             }
@@ -963,8 +1063,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 $criteria->getConditions(),
                 $modifier->getModifiers(),
                 array(
-                    'fsync'    => $this->getFsyncFlag(),
-                    'safe'     => $this->getSafeFlag(),
+                    'j'        => $this->getFsyncFlag(),
+                    'w'        => $this->getSafeFlag(),
                     'upsert'   => false,
                     'multiple' => true
                 )
@@ -978,8 +1078,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             $result = $this->getCollection()->update(
                 $criteria->getConditions(), $modifier->getModifiers(),
                 array(
-                    'fsync'    => $this->getFsyncFlag(),
-                    'safe'     => $this->getSafeFlag(),
+                    'j'        => $this->getFsyncFlag(),
+                    'w'        => $this->getSafeFlag(),
                     'upsert'   => false,
                     'multiple' => true
                 )
@@ -1053,8 +1153,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 $criteria->getConditions(),
                 array(
                     'justOne' => true,
-                    'fsync'   => $this->getFsyncFlag(),
-                    'safe'    => $this->getSafeFlag()
+                    'j'       => $this->getFsyncFlag(),
+                    'w'       => $this->getSafeFlag(),
                 )
             );
         } catch (MongoException $ex) {
@@ -1067,8 +1167,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
                 $criteria->getConditions(),
                 array(
                     'justOne' => true,
-                    'fsync'   => $this->getFsyncFlag(),
-                    'safe'    => $this->getSafeFlag()
+                    'j'       => $this->getFsyncFlag(),
+                    'w'       => $this->getSafeFlag(),
                 )
             );
         }
@@ -1105,7 +1205,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         }
         try {
             $count = $this->getCollection()->count(array('_id' => $this->_id));
-        } catch (MongoException $e) {
+        } catch (MongoException $ex) {
             Yii::log(
                 'Failed to submit count for refresh(); retrying. ' . PHP_EOL
                 . 'Error: ' . $ex->getMessage(),
@@ -1490,8 +1590,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             $result = $this->getCollection()->remove(
                 $criteria->getConditions(), array(
                     'justOne' => false,
-                    'fsync'   => $this->getFsyncFlag(),
-                    'safe'    => $this->getSafeFlag(),
+                    'j'       => $this->getFsyncFlag(),
+                    'w'       => $this->getSafeFlag(),
                 )
             );
         } catch (MongoException $ex) {
@@ -1503,8 +1603,8 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             $result = $this->getCollection()->remove(
                 $criteria->getConditions(), array(
                     'justOne' => false,
-                    'fsync'   => $this->getFsyncFlag(),
-                    'safe'    => $this->getSafeFlag(),
+                    'j'       => $this->getFsyncFlag(),
+                    'w'       => $this->getSafeFlag(),
                 )
             );
         }
@@ -1724,6 +1824,10 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
 			$model->setScenario('update');
 			$model->init();
 
+            // Behaviors have already been attached in the constructor so we need to
+            // prevent duplicates but allow for behaviors that are conditionally
+            // attached based on populated values
+            $model->detachBehaviors();
 			$model->attachBehaviors($model->behaviors());
 
 			if($callAfterFind)
@@ -1785,6 +1889,12 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
         $opRegex = '/^(?:\s*(<>|<=|>=|<|>|=|!=|==))?(.*)$/';
 
         foreach ($this->getSafeAttributeNames() as $attribute) {
+            // Ignore unset embedded documents
+            if (isset(self::$_embeddedConfig[get_class($this)][$attribute])
+                && (!isset($this->_embedded) || null === $this->_embedded->itemAt($attribute))
+            ) {
+                continue;
+            }
             if (null !== $this->$attribute && '' !== $this->$attribute) {
                 if (is_array($this->$attribute) || is_object($this->$attribute)) {
                     $criteria->$attribute = $this->$attribute;

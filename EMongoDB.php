@@ -79,29 +79,27 @@ class EMongoDB extends CApplicationComponent
      */
     private $_mongoConnection;
 
-	/**
-	 * If set to TRUE all internal DB operations will use FSYNC flag with data modification requests,
-	 * in other words, all write operations will have to wait for a disc sync!
-	 *
-	 * MongoDB default value for this flag is: FALSE.
-	 *
-	 * @var boolean $fsyncFlag state of FSYNC flag to use with internal connections (global scope)
-	 * @since v1.0
-	 */
-	public $fsyncFlag = false;
+    /**
+     * If set to TRUE, all internal DB operations will use journaling flag with data
+     * modification requests, in other words, all write operations will have to wait
+     * for a disc sync!
+     *
+     * MongoDB default value for this flag is: false.
+     *
+     * @var boolean
+     * @since v1.0
+     */
+    public $fsyncFlag = false;
 
-	/**
-	 * If set to TRUE all internal DB operations will use SAFE flag with data modification requests.
-	 *
-	 * When SAFE flag is set to TRUE driver will wait for the response from DB, and throw an exception
-	 * if something went wrong, is fet to false, driver will only send operation to DB but will not wait
-	 * for response from DB.
-	 *
-	 * MongoDB default value for this flag is: FALSE.
-	 *
-	 * @var boolean $safeFlag state of SAFE flag (global scope)
-	 */
-	public $safeFlag = false;
+    /**
+     * Default write concern for all internal DB operations with data modification requests.
+     *
+     * MongoDB default value for this flag is: 1.
+     * Value for EMongoDB is set to 0 for backwards compatibility.
+     *
+     * @var integer|string
+     */
+    public $safeFlag = 0;
 
 	/**
 	 * If set to TRUE findAll* methods of models, will return {@see EMongoCursor} instead of
@@ -116,6 +114,13 @@ class EMongoDB extends CApplicationComponent
 	 * @var boolean $useCursor state of Use Cursor flag (global scope)
 	 */
 	public $useCursor = false;
+
+    /**
+     * Whether to generate profiler log messages.
+     * @var boolean
+     * @since v1.4.1
+     */
+    public $enableProfiler = false;
 
 	/**
 	 * Storage location for temporary files used by the GridFS Feature.

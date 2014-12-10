@@ -57,18 +57,20 @@ abstract class EMongoSoftDocument extends EMongoDocument
 			parent::__set($name, $value);
 	}
 
-	/**
-	 * Adds soft attributes support to magic __isset method
-	 * @see EMongoEmbeddedDocument::__isset()
-	 * @since v1.3.4
-	 */
-	public function __isset($name)
-	{
-		if(array_key_exists($name, $this->softAttributes)) // Use of array_key_exists is mandatory !!!
-			return true;
-		else
-			return parent::__isset($name);
-	}
+    /**
+     * Adds soft attributes support to magic __isset method
+     * @see EMongoEmbeddedDocument::__isset()
+     * @since v1.3.4
+     */
+    public function __isset($name)
+    {
+        // Use of array_key_exists is mandatory !!!
+        if (array_key_exists($name, $this->softAttributes)) {
+            return isset($this->softAttributes[$name]);
+        } else {
+            return parent::__isset($name);
+        }
+    }
 
 	/**
 	 * Adds soft attributes support to magic __unset method
@@ -147,7 +149,7 @@ abstract class EMongoSoftDocument extends EMongoDocument
 	{
 		$arr = parent::_toArray();
 
-		foreach($this->softAttributes as $key => $value) {
+		foreach ($this->softAttributes as $key => $value) {
 			if (null === $value) {
 				// when a softAttribute has a NULL value, it wants to be excluded
 				unset($arr[$key]);
