@@ -71,6 +71,7 @@ class EMongoCriteria extends CComponent
 		'geowithin'     => '$geoWithin',
 		'geointersects' => '$geoIntersects',
 		'type'          => '$type',
+        'search'        => '$search',
 	);
 
 	const SORT_ASC		= 1;
