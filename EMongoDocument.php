@@ -856,11 +856,14 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             return true;
         }
 
-        throw new EMongoException(
-            Yii::t(
-                'yii', 'Can\t save document to disk, or try to save empty document!'
-            )
-        );
+        if (! $rawData) {
+            $message = Yii::t('yii', 'Failed to save document');
+        } else {
+            $message = Yii::t('yii', 'Unable to save an empty document: {class}',
+                array('{class}' => get_class($this))
+            );
+        }
+        throw new EMongoException($message);
     }
 
     /**
@@ -1025,11 +1028,14 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             return true;
         }
 
-        throw new CException(
-            Yii::t(
-                'yii', 'Can\t save document to disk, or try to save empty document!'
-            )
-        );
+        if (! $rawData) {
+            $message = Yii::t('yii', 'Failed to save document');
+        } else {
+            $message = Yii::t('yii', 'Unable to save an empty document: {class}',
+                array('{class}' => get_class($this))
+            );
+        }
+        throw new EMongoException($message);
     }
 
     /**

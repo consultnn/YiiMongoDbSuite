@@ -142,6 +142,8 @@ abstract class EMongoGridFS extends EMongoDocument
      * @param array|null $attributes Attributes to be filtered from raw data
      *
      * @return boolean Success of insert
+     * @throws EMongoException If failed to persist document
+     * @throws CException If a filename was not specified
      */
     protected function insertData(array $rawData, $attributes)
     {
@@ -155,13 +157,13 @@ abstract class EMongoGridFS extends EMongoDocument
         }
 
         // check file
-        $filename = "";
-        if (!array_key_exists('filename', $rawData)) {
+        if (empty($rawData['filename'])) {
             throw new CException(Yii::t('yii', 'We need a filename'));
         } else {
             $filename = $rawData['filename'];
             unset($rawData['filename']);
         }
+
         $profile = $this->getEnableProfiler();
         if ($profile) {
             $profile = EMongoCriteria::commandToString(
@@ -220,11 +222,7 @@ abstract class EMongoGridFS extends EMongoDocument
             return true;
         }
 
-        throw new CException(
-            Yii::t(
-                'yii', 'Can\t save document to disk, or try to save empty document!'
-            )
-        );
+        throw new EMongoException(Yii::t('yii', 'Failed to save document'));
     }
 
     /**
