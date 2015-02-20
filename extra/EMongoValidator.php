@@ -121,7 +121,7 @@ class EMongoValidator extends CValidator
                         // Strip any dashes used in displayed representations
                         $value = str_replace('-', '', $value);
                         if (preg_match($regex, $value)) {
-                            $value = new MongoBinData($value, $type);
+                            $value = new MongoBinData(pack('h*', $value), $type);
                         }
                     }
 
@@ -129,8 +129,12 @@ class EMongoValidator extends CValidator
                         $msg = '{attribute} must be an instance of MongoBinData.';
                     } elseif (! in_array($value->type, $uuidTypes)) {
                         $msg = '{attribute} must be of type UUID.';
-                    } elseif (! preg_match($regex, $value->bin)) {
-                        $msg = '{attribute} must be a valid UUID.';
+                    } elseif (version_compare(MongoClient::VERSION, '1.6') < 0) {
+                        // Mongo driver internally validates as of 1.6
+                        $unpacked = unpack('h*', $value->bin);
+                        if (empty($unpacked[1]) || ! preg_match($regex, $unpacked[1])) {
+                            $msg = '{attribute} must be a valid UUID.';
+                        }
                     }
                     break;
                 default:
