@@ -856,7 +856,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             return true;
         }
 
-        if (! $rawData) {
+        if ($rawData) {
             $message = Yii::t('yii', 'Failed to save document');
         } else {
             $message = Yii::t('yii', 'Unable to save an empty document: {class}',
@@ -1028,7 +1028,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
             return true;
         }
 
-        if (! $rawData) {
+        if ($rawData) {
             $message = Yii::t('yii', 'Failed to save document');
         } else {
             $message = Yii::t('yii', 'Unable to save an empty document: {class}',
