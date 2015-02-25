@@ -635,11 +635,13 @@ class EMongoCriteria extends CComponent
             } elseif ($value instanceof MongoBinData) {
                 switch ($value->type) {
                     case MongoBinData::UUID:
-                        $string = 'UUID(' . CJSON::encode($value->bin) . ')';
+                    case MongoBinData::UUID_RFC4122:
+                        $unpacked = unpack('h*', $value->bin);
+                        $string = 'UUID("' . $unpacked[1] . '")';
                         break;
                     default:
-                        $string = 'BinData(' . $value->type . ', '
-                            . CJSON::encode($value->bin) . ')';
+                        $string = 'BinData(' . $value->type . ', "'
+                            . base64_decode($value->bin) . '")';
                 }
             } else {
                 $string = CJSON::encode($value);
