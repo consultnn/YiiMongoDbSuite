@@ -73,6 +73,12 @@ class EMongoHttpSession extends CHttpSession
      */
     public $profiler = false;
     /**
+     * Optional override for the read preference of session operations
+     * @see MongoCollection::setReadPreference
+     * @var string
+     */
+    public $readPreference;
+    /**
      * @var array insert options
      */
     private $_options;
@@ -98,6 +104,9 @@ class EMongoHttpSession extends CHttpSession
             $this->_collection = $db->getDbInstance()->selectCollection(
                 $collectionName
             );
+            if ($this->readPreference) {
+                $this->_collection->setReadPreference($this->readPreference);
+            }
         }
         return $this->_collection;
     }
