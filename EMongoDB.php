@@ -129,6 +129,19 @@ class EMongoDB extends CApplicationComponent
 	 */
 	public $gridFStemporaryFolder = null;
 
+    /**
+     * If a connection failure occurs on load, this flag controls whether the connection should be retried.
+     * @var boolean
+     */
+    public $autoReconnect = true;
+
+    /**
+     * Internal flag indicating whether the connection should be forcibly closed.
+     * Work around for Mongo driver not clearing old persistent connections on connection failure
+     * @var boolean
+     */
+    private $forceClose = false;
+
 	/**
 	 * Connect to DB if connection is already connected this method doeas nothing
 	 * @since v1.0
@@ -149,34 +162,63 @@ class EMongoDB extends CApplicationComponent
     public function getConnection()
     {
         if (null === $this->_mongoConnection) {
+            $params = array('connect' => $this->autoConnect);
+
+            if (!empty($this->replicaSet)) {
+                $params['replicaSet']     = $this->replicaSet;
+                $params['readPreference'] = $this->readPreference;
+            }
+            Yii::trace('Opening MongoDB connection', 'MongoDb.EMongoDB');
+            if (empty($this->connectionString)) {
+                throw new EMongoException(
+                    Yii::t('yii', 'EMongoDB.connectionString cannot be empty.')
+                );
+            }
             try {
-                Yii::trace('Opening MongoDB connection', 'MongoDb.EMongoDB');
-                if (empty($this->connectionString)) {
+                $this->_mongoConnection = new MongoClient(
+                    $this->connectionString,
+                    $params
+                );
+            } catch (MongoConnectionException $e) {
+                // To prevent the next request from also failing to connect, we need
+                // to force the connection closed. Otherwise, the next connection
+                // will have also have to connect again
+                $this->forceClose = true;
+                $failureMessage = 'EMongoDB failed to open connection: {error}';
+
+                if ($this->autoReconnect) {
+                    Yii::trace(
+                        'MongoDB connection failure: ' . $e->getMessage(),
+                        'MongoDb.EMongoDB'
+                    );
+
+                    try {
+                        $this->_mongoConnection = new MongoClient(
+                            $this->connectionString,
+                            $params
+                        );
+                    } catch (MongoConnectionException $inner) {
+                        throw new EMongoException(
+                            Yii::t(
+                                'yii',
+                                $failureMessage,
+                                array('{error}' => $inner->getMessage())
+                            ),
+                            $inner->getCode(),
+                            $inner
+                        );
+                    }
+                } else {
                     throw new EMongoException(
-                        Yii::t('yii', 'EMongoDB.connectionString cannot be empty.')
+                        Yii::t(
+                            'yii',
+                            $failureMessage,
+                            array('{error}'=>$e->getMessage())
+                        ),
+                        $e->getCode(),
+                        $e
                     );
                 }
-
-                $params = array('connect' => $this->autoConnect);
-
-                if (!empty($this->replicaSet)) {
-                    $params['replicaSet']     = $this->replicaSet;
-                    $params['readPreference'] = $this->readPreference;
-                }
-
-                $this->_mongoConnection = new MongoClient(
-                    $this->connectionString, $params
-                );
-
-            } catch (MongoConnectionException $e) {
-                throw new EMongoException(
-                    Yii::t(
-                        'yii',
-                        'EMongoDB failed to open connection: {error}',
-                        array('{error}'=>$e->getMessage())
-                    ),
-                    $e->getCode()
-                );
             }
         }
 
@@ -246,5 +288,15 @@ class EMongoDB extends CApplicationComponent
     {
         $result = $this->getDbInstance()->drop();
         return isset($result['ok']) && 1 == $result['ok'];
+    }
+
+    /**
+     * Closes the persistent connection if a connection failure was detected earlier
+     */
+    public function __destruct()
+    {
+        if ($this->forceClose) {
+            $this->close();
+        }
     }
 }
