@@ -166,7 +166,7 @@ abstract class EMongoDocument extends EMongoEmbeddedDocument
      */
     public function getMongoDBComponent()
     {
-        if (null === self::$_emongoDb[$this->mongoComponentId]) {
+        if (!isset(self::$_emongoDb[$this->mongoComponentId])) {
             self::$_emongoDb[$this->mongoComponentId]
                 = Yii::app()->getComponent($this->mongoComponentId);
         }
