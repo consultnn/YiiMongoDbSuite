@@ -510,28 +510,29 @@ class EMongoCriteria extends CComponent
     {
         $op = self::$operators[$op];
 
-        if ($op == self::$operators['or']) {
+        if ($op === self::$operators['or']) {
             if (!isset($this->_conditions[$op])) {
                 $this->_conditions[$op] = array();
             }
+
             $this->_conditions[$op][] = array($fieldName=>$value);
+        } elseif ($op === self::$operators['search']) {
+	        $this->_conditions['$text'][$op] = $value;
         } else {
-            if (!isset($this->_conditions[$fieldName])
-                && $op != self::$operators['equals']
-            ) {
+            if (!isset($this->_conditions[$fieldName]) && ($op !== self::$operators['equals'])) {
                 $this->_conditions[$fieldName] = array();
             }
 
-            if ($op != self::$operators['equals']) {
-                if (!is_array($this->_conditions[$fieldName])
-                    || count(array_diff(array_keys($this->_conditions[$fieldName]), array_values(self::$operators))) > 0
-                ) {
-                    $this->_conditions[$fieldName] = array();
-                }
-                $this->_conditions[$fieldName][$op] = $value;
-            } else {
-                $this->_conditions[$fieldName] = $value;
-            }
+	        if ($op === self::$operators['equals']) {
+		        $this->_conditions[$fieldName] = $value;
+	        } else {
+		        if (!is_array($this->_conditions[$fieldName])
+			        || count(array_diff(array_keys($this->_conditions[$fieldName]), array_values(self::$operators))) > 0
+		        ) {
+			        $this->_conditions[$fieldName] = array();
+		        }
+		        $this->_conditions[$fieldName][$op] = $value;
+	        }
         }
 
         return $this;
